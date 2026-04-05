@@ -1,0 +1,9 @@
+{
+  "name": "chubbyclaw-capabilities-official",
+  "description": "Official ChubbyClaw managed directory of high quality capabilities.",
+  "owner": {
+    "name": "ChubbyClaw",
+    "email": "support@chubbyclaw.com"
+  },
+  "capabilities": []
+}

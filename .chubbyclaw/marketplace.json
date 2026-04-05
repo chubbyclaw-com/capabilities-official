@@ -5,5 +5,27 @@
     "name": "ChubbyClaw",
     "email": "support@chubbyclaw.com"
   },
-  "capabilities": []
+  "capabilities": [
+    {
+      "name": "superpowers",
+      "description": "Superpowers teaches Claude brainstorming, subagent driven development with built in code review, systematic debugging, and red/green TDD. Additionally, it teaches Claude how to author and test new skills.",
+      "category": "development",
+      "source": {
+        "type": "url",
+        "url": "https://github.com/obra/superpowers.git"
+      },
+      "homepage": "https://github.com/obra/superpowers"
+    },
+    {
+      "name": "chrome-devtools-mcp",
+      "description": "Control and inspect a live Chrome browser from your coding agent. Record performance traces, analyze network requests, check console messages with source-mapped stack traces, and automate browser actions with Puppeteer.",
+      "category": "development",
+      "source": {
+        "type": "url",
+        "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp.git",
+        "sha": "c2d8009ff75f76bce1ec4cf79c2467b50d81725e"
+      },
+      "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+    }
+  ]
 }

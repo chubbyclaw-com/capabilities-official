@@ -19,4 +19,4 @@ To add a capability to this marketplace:
 4. Add MCP tools in `mcp.json` (if applicable)
 5. Add an entry to `.chubbyclaw/marketplace.json`
 
-See `capabilities/example-capability/` for a complete reference.
+See [SCHEMA.md](./SCHEMA.md) for the complete directory layout reference.

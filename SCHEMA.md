@@ -159,7 +159,7 @@ All capability contents are discovered by convention from the capability root. N
 │   └── <skill-name>/
 │       └── SKILL.md         # Required per skill — YAML frontmatter + instructions
 │
-├── mcp.json                 # Optional: MCP server configuration (action layer)
+├── .mcp.json                 # Optional: MCP server configuration (action layer)
 │
 └── README.md                # Recommended: human-readable docs
 ```
@@ -182,7 +182,7 @@ Full skill instructions here...
 | `name` | Yes | Must match the parent directory name |
 | `description` | Yes | Shown in agent system prompt for skill discovery |
 
-### `mcp.json`
+### `.mcp.json`
 
 MCP server configuration at the capability root:
 
@@ -214,7 +214,7 @@ A repository that hosts multiple capabilities:
 │   │   │   └── capability.json
 │   │   ├── skills/
 │   │   │   └── ...
-│   │   └── mcp.json
+│   │   └── .mcp.json
 │   │
 │   └── <capability-b>/
 │       └── ...
@@ -235,7 +235,7 @@ A repository that is itself one capability:
 │
 ├── skills/
 │   └── ...
-├── mcp.json
+├── .mcp.json
 └── README.md
 ```
 

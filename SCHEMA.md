@@ -143,6 +143,63 @@ The manifest is intentionally minimal. Capability contents (skills, MCP servers)
 | `name` | string | Yes | Unique identifier (kebab-case) |
 | `description` | string | Yes | Summary shown in UI and injected into agent system prompt |
 | `author` | object | No | `{ "name": "...", "email": "...", "url": "..." }` |
+| `credentials` | array | No | Credentials this capability needs (see [`credentials`](#credentials)) |
+
+### `credentials`
+
+Declares what API keys or OAuth connections this capability requires. Capabilities without `credentials` fall back to the freeform env override editor.
+
+```json
+"credentials": [
+  {
+    "name": "TAVILY_API_KEY",
+    "type": "api_key",
+    "description": "Tavily search API key",
+    "required": true,
+    "help_url": "https://tavily.com/dashboard"
+  },
+  {
+    "name": "GOOGLE_DRIVE",
+    "type": "oauth",
+    "provider": "google",
+    "scopes": ["drive.readonly", "drive.file"],
+    "description": "Access your Google Drive files",
+    "required": true
+  }
+]
+```
+
+Each entry in the `credentials` array:
+
+| Field | Type | Applies to | Required | Description |
+|-------|------|------------|----------|-------------|
+| `name` | string | both | Yes | For `api_key`: the environment variable name (e.g. `TAVILY_API_KEY`). For `oauth`: a connection identifier (e.g. `GOOGLE_DRIVE`). |
+| `type` | string | both | Yes | `"api_key"` or `"oauth"` |
+| `provider` | string | `oauth` only | Yes (oauth) | `"google"`, `"github"`, `"slack"`, or `"custom"` |
+| `scopes` | array of strings | `oauth` only | No | OAuth scopes to request (e.g. `["drive.readonly"]`) |
+| `required` | boolean | both | No | Whether the credential is required to run. Defaults to `true`. |
+| `description` | string | both | No | User-facing label shown in the credential picker |
+| `help_url` | string | `api_key` only | No | Link to where the user can obtain the key |
+| `oauth_config` | object | `oauth` only | No | Custom OAuth endpoints — only when `provider` is `"custom"` |
+
+#### Custom OAuth Provider (`oauth_config`)
+
+When `provider` is `"custom"`, supply the OAuth endpoints in `oauth_config`:
+
+```json
+{
+  "name": "MY_SERVICE",
+  "type": "oauth",
+  "provider": "custom",
+  "oauth_config": {
+    "authorize_url": "https://my-service.com/oauth/authorize",
+    "token_url": "https://my-service.com/oauth/token",
+    "client_id_env": "MY_SERVICE_CLIENT_ID"
+  }
+}
+```
+
+The user provides `client_id` / `client_secret` via env override.
 
 ---
 

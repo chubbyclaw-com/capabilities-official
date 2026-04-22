@@ -26,6 +26,18 @@
         "sha": "c2d8009ff75f76bce1ec4cf79c2467b50d81725e"
       },
       "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+    },
+    {
+      "name": "singapore-onemap",
+      "description": "Search Singapore addresses, plan routes, and find nearby facilities using Singapore's official OneMap service.",
+      "category": "location",
+      "source": "./capabilities/singapore-onemap"
+    },
+    {
+      "name": "singapore-ura",
+      "description": "Query Singapore private residential property data via URA — search projects, view real transaction records, new launch sales, supply pipeline, and planning decisions.",
+      "category": "location",
+      "source": "./capabilities/singapore-ura"
     }
   ]
 }

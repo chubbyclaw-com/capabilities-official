@@ -1,0 +1,8 @@
+{
+  "name": "singapore-ura",
+  "description": "Query Singapore private residential property data via URA — search projects, view real transaction records, new launch sales, supply pipeline, and planning decisions.",
+  "author": {
+    "name": "ChubbyClaw",
+    "email": "support@chubbyclaw.com"
+  }
+}

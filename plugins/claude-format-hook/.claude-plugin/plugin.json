@@ -1,0 +1,11 @@
+{
+  "name": "claude-format-hook",
+  "description": "Auto-format code after Claude edits files. Honors project-level treefmt/dprint if configured; otherwise picks biome/prettier/ruff/goimports/rustfmt/shfmt/taplo/ktlint by extension. Covers JS/TS/JSON, Python, Markdown, YAML, CSS/SCSS, HTML, shell, TOML, Go, Rust, and Kotlin.",
+  "version": "1.2.0",
+  "author": {
+    "name": "ChubbyClaw"
+  },
+  "homepage": "https://github.com/ryanlewis/claude-format-hook",
+  "license": "MIT",
+  "keywords": ["format", "formatter", "hook", "biome", "prettier", "ruff", "goimports", "rustfmt", "shfmt", "taplo", "ktlint", "treefmt", "dprint"]
+}

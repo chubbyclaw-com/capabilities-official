@@ -34,10 +34,10 @@
       "source": "./capabilities/singapore-onemap"
     },
     {
-      "name": "singapore-ura",
-      "description": "Query Singapore private residential property data via URA — search projects, view real transaction records, new launch sales, supply pipeline, and planning decisions.",
+      "name": "singapore-property",
+      "description": "Singapore property decision assistant — buyer / seller / agent workflows backed by URA + HDB + rental data.",
       "category": "location",
-      "source": "./capabilities/singapore-ura"
+      "source": "./capabilities/singapore-property"
     }
   ]
 }

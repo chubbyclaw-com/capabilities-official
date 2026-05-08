@@ -164,6 +164,10 @@ COLLECTION_FILES = {
     "candidates": ("candidates.json", "candidates", ("project_name",)),
 }
 
+CANDIDATE_STAGES = ["shortlist", "viewing_scheduled", "viewed", "offered", "declined", "closed"]
+CANDIDATE_AUTO_STAGES = ["shortlist", "viewing_scheduled", "viewed", "offered", "closed"]
+TERMINAL_STAGES = {"declined", "closed"}
+
 
 def _collection_handler(resource: str, args) -> int:
     fname, key, required = COLLECTION_FILES[resource]
@@ -234,6 +238,32 @@ def _collection_handler(resource: str, args) -> int:
     return 2
 
 
+def _candidates_advance(args) -> int:
+    fname, key, _ = COLLECTION_FILES["candidates"]
+    with locked_write(fname) as state:
+        current = state["value"] or {key: []}
+        items = current.get(key, [])
+        for i, item in enumerate(items):
+            if item.get("id") != args.id:
+                continue
+            if args.stage:
+                if args.stage not in CANDIDATE_STAGES:
+                    die(f"unknown stage: {args.stage}", allowed=CANDIDATE_STAGES)
+                items[i]["stage"] = args.stage
+            else:
+                cur = item.get("stage")
+                if cur in TERMINAL_STAGES:
+                    die(f"candidate already in terminal stage: {cur}")
+                idx = CANDIDATE_AUTO_STAGES.index(cur) if cur in CANDIDATE_AUTO_STAGES else -1
+                items[i]["stage"] = CANDIDATE_AUTO_STAGES[idx + 1]
+            current[key] = items
+            state["value"] = current
+            sys.stdout.write(json.dumps(items[i], ensure_ascii=False, indent=2) + "\n")
+            return 0
+    die("candidate not found", id=args.id)
+    return 2
+
+
 # ---------- dispatch ----------
 
 def main(argv=None) -> int:
@@ -261,12 +291,28 @@ def main(argv=None) -> int:
     h_upd = h_sub.add_parser("update"); h_upd.add_argument("--id", required=True); h_upd.add_argument("--patch", required=True)
     h_rm = h_sub.add_parser("remove"); h_rm.add_argument("--id", required=True)
 
+    # ----- candidates -----
+    c = sub.add_parser("candidates")
+    c_sub = c.add_subparsers(dest="verb", required=True)
+    c_sub.add_parser("list")
+    c_get = c_sub.add_parser("get"); c_get.add_argument("--id", required=True)
+    c_add = c_sub.add_parser("add"); c_add.add_argument("--data", required=True)
+    c_upd = c_sub.add_parser("update"); c_upd.add_argument("--id", required=True); c_upd.add_argument("--patch", required=True)
+    c_rm = c_sub.add_parser("remove"); c_rm.add_argument("--id", required=True)
+    c_adv = c_sub.add_parser("advance-stage")
+    c_adv.add_argument("--id", required=True)
+    c_adv.add_argument("--stage", required=False)
+
     args = parser.parse_args(argv)
 
     if args.resource == "profile":
         return _profile(args)
     if args.resource == "holdings":
         return _collection_handler("holdings", args)
+    if args.resource == "candidates":
+        if args.verb == "advance-stage":
+            return _candidates_advance(args)
+        return _collection_handler("candidates", args)
     die(f"resource not implemented: {args.resource}")
     return 2
 

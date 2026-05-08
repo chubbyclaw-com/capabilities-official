@@ -169,8 +169,58 @@ CANDIDATE_AUTO_STAGES = ["shortlist", "viewing_scheduled", "viewed", "offered", 
 TERMINAL_STAGES = {"declined", "closed"}
 
 
-def _collection_handler(resource: str, args) -> int:
+CLIENTS_DIR = "clients"
+CLIENTS_INDEX = "clients/index.json"
+
+
+def _client_path(client_id: str) -> Path:
+    safe = slugify(client_id)
+    if safe != client_id:
+        die("client id must be slug-safe (lowercase letters, digits, hyphens)", id=client_id)
+    return file_path(f"{CLIENTS_DIR}/{client_id}.json")
+
+
+def _client_index_upsert(client_id: str, name: str, role: str, status: str) -> None:
+    with locked_write(CLIENTS_INDEX) as state:
+        idx = state["value"] or {"clients": []}
+        clients = idx.setdefault("clients", [])
+        for entry in clients:
+            if entry["id"] == client_id:
+                entry.update({"name": name, "role": role, "status": status,
+                              "updated_at": datetime.utcnow().isoformat() + "Z"})
+                state["value"] = idx
+                return
+        clients.append({
+            "id": client_id, "name": name, "role": role, "status": status,
+            "updated_at": datetime.utcnow().isoformat() + "Z",
+        })
+        state["value"] = idx
+
+
+def _client_index_remove(client_id: str) -> None:
+    with locked_write(CLIENTS_INDEX) as state:
+        idx = state["value"] or {"clients": []}
+        idx["clients"] = [c for c in idx.get("clients", []) if c["id"] != client_id]
+        state["value"] = idx
+
+
+def _collection_files_scoped(resource: str, client):
+    """Return (fname, key, required). When `client` is set, redirect to the
+    client's per-resource sub-key inside clients/<id>.json instead of the
+    global file."""
     fname, key, required = COLLECTION_FILES[resource]
+    if client is None:
+        return fname, key, required
+    cpath = _client_path(client)
+    cpath.parent.mkdir(parents=True, exist_ok=True)
+    if not cpath.exists():
+        die("client not found", client=client)
+    return f"{CLIENTS_DIR}/{client}.json", resource, required
+
+
+def _collection_handler(resource: str, args) -> int:
+    client = getattr(args, "client", None)
+    fname, key, required = _collection_files_scoped(resource, client)
 
     if args.verb == "list":
         data = load(fname, {key: []})
@@ -285,23 +335,30 @@ def main(argv=None) -> int:
     # ----- holdings -----
     h = sub.add_parser("holdings")
     h_sub = h.add_subparsers(dest="verb", required=True)
-    h_sub.add_parser("list")
-    h_get = h_sub.add_parser("get"); h_get.add_argument("--id", required=True)
-    h_add = h_sub.add_parser("add"); h_add.add_argument("--data", required=True)
-    h_upd = h_sub.add_parser("update"); h_upd.add_argument("--id", required=True); h_upd.add_argument("--patch", required=True)
-    h_rm = h_sub.add_parser("remove"); h_rm.add_argument("--id", required=True)
+    h_list = h_sub.add_parser("list"); h_list.add_argument("--client", default=None)
+    h_get = h_sub.add_parser("get"); h_get.add_argument("--id", required=True); h_get.add_argument("--client", default=None)
+    h_add = h_sub.add_parser("add"); h_add.add_argument("--data", required=True); h_add.add_argument("--client", default=None)
+    h_upd = h_sub.add_parser("update"); h_upd.add_argument("--id", required=True); h_upd.add_argument("--patch", required=True); h_upd.add_argument("--client", default=None)
+    h_rm = h_sub.add_parser("remove"); h_rm.add_argument("--id", required=True); h_rm.add_argument("--client", default=None)
 
     # ----- candidates -----
     c = sub.add_parser("candidates")
     c_sub = c.add_subparsers(dest="verb", required=True)
-    c_sub.add_parser("list")
-    c_get = c_sub.add_parser("get"); c_get.add_argument("--id", required=True)
-    c_add = c_sub.add_parser("add"); c_add.add_argument("--data", required=True)
-    c_upd = c_sub.add_parser("update"); c_upd.add_argument("--id", required=True); c_upd.add_argument("--patch", required=True)
-    c_rm = c_sub.add_parser("remove"); c_rm.add_argument("--id", required=True)
-    c_adv = c_sub.add_parser("advance-stage")
-    c_adv.add_argument("--id", required=True)
-    c_adv.add_argument("--stage", required=False)
+    c_list = c_sub.add_parser("list"); c_list.add_argument("--client", default=None)
+    c_get = c_sub.add_parser("get"); c_get.add_argument("--id", required=True); c_get.add_argument("--client", default=None)
+    c_add = c_sub.add_parser("add"); c_add.add_argument("--data", required=True); c_add.add_argument("--client", default=None)
+    c_upd = c_sub.add_parser("update"); c_upd.add_argument("--id", required=True); c_upd.add_argument("--patch", required=True); c_upd.add_argument("--client", default=None)
+    c_rm = c_sub.add_parser("remove"); c_rm.add_argument("--id", required=True); c_rm.add_argument("--client", default=None)
+    c_adv = c_sub.add_parser("advance-stage"); c_adv.add_argument("--id", required=True); c_adv.add_argument("--stage"); c_adv.add_argument("--client", default=None)
+
+    # ----- clients -----
+    cl = sub.add_parser("clients")
+    cl_sub = cl.add_subparsers(dest="verb", required=True)
+    cl_sub.add_parser("list")
+    cl_get = cl_sub.add_parser("get"); cl_get.add_argument("--id", required=True)
+    cl_create = cl_sub.add_parser("create"); cl_create.add_argument("--data", required=True)
+    cl_upd = cl_sub.add_parser("update"); cl_upd.add_argument("--id", required=True); cl_upd.add_argument("--patch", required=True)
+    cl_rm = cl_sub.add_parser("remove"); cl_rm.add_argument("--id", required=True)
 
     args = parser.parse_args(argv)
 
@@ -313,6 +370,8 @@ def main(argv=None) -> int:
         if args.verb == "advance-stage":
             return _candidates_advance(args)
         return _collection_handler("candidates", args)
+    if args.resource == "clients":
+        return _clients(args)
     die(f"resource not implemented: {args.resource}")
     return 2
 
@@ -338,6 +397,70 @@ def _profile(args) -> int:
             clear_path(current, args.field)
             state["value"] = current
         sys.stdout.write(json.dumps(state["value"], ensure_ascii=False, indent=2) + "\n")
+        return 0
+
+    die(f"unknown verb: {args.verb}")
+    return 2
+
+
+def _clients(args) -> int:
+    if args.verb == "list":
+        idx = load(CLIENTS_INDEX, {"clients": []})
+        clients = idx.get("clients", []) if isinstance(idx, dict) else []
+        sys.stdout.write(json.dumps(clients, ensure_ascii=False, indent=2) + "\n")
+        return 0
+
+    if args.verb == "get":
+        cpath = _client_path(args.id)
+        if not cpath.exists():
+            die("client not found", id=args.id)
+        with cpath.open("r", encoding="utf-8") as f:
+            content = f.read()
+        if not content.endswith("\n"):
+            content += "\n"
+        sys.stdout.write(content)
+        return 0
+
+    if args.verb == "create":
+        data = parse_json_arg(args.data, "--data")
+        if not isinstance(data, dict):
+            die("--data must be a JSON object")
+        for f in ("id", "name", "role"):
+            if not data.get(f):
+                die(f"required field missing: {f}", field=f)
+        cpath = _client_path(data["id"])
+        cpath.parent.mkdir(parents=True, exist_ok=True)
+        if cpath.exists():
+            die("client id already exists", id=data["id"])
+        data.setdefault("status", "qualifying")
+        with locked_write(f"{CLIENTS_DIR}/{data['id']}.json") as state:
+            state["value"] = data
+        _client_index_upsert(data["id"], data["name"], data["role"], data["status"])
+        sys.stdout.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+        return 0
+
+    if args.verb == "update":
+        patch = parse_json_arg(args.patch, "--patch")
+        if not isinstance(patch, dict):
+            die("--patch must be a JSON object")
+        cpath = _client_path(args.id)
+        if not cpath.exists():
+            die("client not found", id=args.id)
+        with locked_write(f"{CLIENTS_DIR}/{args.id}.json") as state:
+            cur = state["value"] or {}
+            state["value"] = deep_merge(cur, patch)
+            merged = state["value"]
+        _client_index_upsert(args.id, merged.get("name", ""),
+                             merged.get("role", ""), merged.get("status", ""))
+        sys.stdout.write(json.dumps(merged, ensure_ascii=False, indent=2) + "\n")
+        return 0
+
+    if args.verb == "remove":
+        cpath = _client_path(args.id)
+        if cpath.exists():
+            cpath.unlink()
+        _client_index_remove(args.id)
+        sys.stdout.write(json.dumps({"removed": args.id}, ensure_ascii=False, indent=2) + "\n")
         return 0
 
     die(f"unknown verb: {args.verb}")

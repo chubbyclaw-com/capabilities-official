@@ -360,6 +360,16 @@ def main(argv=None) -> int:
     cl_upd = cl_sub.add_parser("update"); cl_upd.add_argument("--id", required=True); cl_upd.add_argument("--patch", required=True)
     cl_rm = cl_sub.add_parser("remove"); cl_rm.add_argument("--id", required=True)
 
+    # ----- notes -----
+    n = sub.add_parser("notes")
+    n_sub = n.add_subparsers(dest="verb", required=True)
+    n_app = n_sub.add_parser("append")
+    n_app.add_argument("--target", required=True,
+                       choices=["profile", "holdings", "candidates", "clients"])
+    n_app.add_argument("--id", required=False)
+    n_app.add_argument("--client", required=False)
+    n_app.add_argument("--text", required=True)
+
     args = parser.parse_args(argv)
 
     if args.resource == "profile":
@@ -372,6 +382,8 @@ def main(argv=None) -> int:
         return _collection_handler("candidates", args)
     if args.resource == "clients":
         return _clients(args)
+    if args.resource == "notes":
+        return _notes(args)
     die(f"resource not implemented: {args.resource}")
     return 2
 
@@ -464,6 +476,57 @@ def _clients(args) -> int:
         return 0
 
     die(f"unknown verb: {args.verb}")
+    return 2
+
+
+def _notes(args) -> int:
+    if args.verb != "append":
+        die(f"unknown verb: {args.verb}")
+    text = args.text.strip()
+    if not text:
+        die("--text must not be empty")
+
+    if args.target == "profile":
+        with locked_write("profile.json") as state:
+            cur = state["value"] or {}
+            existing = cur.get("notes", "")
+            cur["notes"] = (existing + "\n" + text).strip() if existing else text
+            state["value"] = cur
+        sys.stdout.write(json.dumps({"notes": cur["notes"]}, ensure_ascii=False) + "\n")
+        return 0
+
+    if args.target in ("holdings", "candidates"):
+        if not args.id:
+            die("--id is required for target", target=args.target)
+        fname, key, _ = _collection_files_scoped(args.target, args.client)
+        with locked_write(fname) as state:
+            current = state["value"] or {key: []}
+            items = current.get(key, [])
+            for i, item in enumerate(items):
+                if item.get("id") == args.id:
+                    existing = item.get("notes", "")
+                    items[i]["notes"] = (existing + "\n" + text).strip() if existing else text
+                    current[key] = items
+                    state["value"] = current
+                    sys.stdout.write(json.dumps({"id": args.id, "notes": items[i]["notes"]}) + "\n")
+                    return 0
+        die(f"{args.target} not found", id=args.id)
+
+    if args.target == "clients":
+        if not args.client:
+            die("--client is required for target=clients")
+        cpath = _client_path(args.client)
+        if not cpath.exists():
+            die("client not found", id=args.client)
+        with locked_write(f"{CLIENTS_DIR}/{args.client}.json") as state:
+            cur = state["value"] or {}
+            existing = cur.get("notes", "")
+            cur["notes"] = (existing + "\n" + text).strip() if existing else text
+            state["value"] = cur
+        sys.stdout.write(json.dumps({"id": args.client, "notes": cur["notes"]}) + "\n")
+        return 0
+
+    die(f"unknown target: {args.target}")
     return 2
 
 

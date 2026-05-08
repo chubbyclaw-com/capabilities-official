@@ -114,6 +114,38 @@ def warn(message: str, **fields: Any) -> None:
     sys.stderr.write(json.dumps(payload) + "\n")
 
 
+def deep_merge(base: dict, patch: dict) -> dict:
+    out = dict(base) if base else {}
+    for k, v in patch.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def clear_path(obj, dotted: str) -> bool:
+    """Delete a nested key. Returns True if removed, False if missing."""
+    parts = dotted.split(".")
+    cur = obj
+    for p in parts[:-1]:
+        if not isinstance(cur, dict) or p not in cur:
+            return False
+        cur = cur[p]
+    last = parts[-1]
+    if isinstance(cur, dict) and last in cur:
+        del cur[last]
+        return True
+    return False
+
+
+def parse_json_arg(raw: str, what: str):
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        die(f"{what} must be valid JSON", detail=str(e))
+
+
 # ---------- dispatch ----------
 
 def main(argv=None) -> int:
@@ -123,19 +155,48 @@ def main(argv=None) -> int:
     )
     sub = parser.add_subparsers(dest="resource", required=True)
 
-    # Subcommands wired in later tasks. Scaffolding only handles `profile get`
-    # so the smoke test passes.
+    # ----- profile -----
     profile = sub.add_parser("profile")
-    profile_sub = profile.add_subparsers(dest="verb", required=True)
-    profile_sub.add_parser("get")
+    p_sub = profile.add_subparsers(dest="verb", required=True)
+    p_sub.add_parser("get")
+    p_set = p_sub.add_parser("set")
+    p_set.add_argument("--patch", required=True)
+    p_clear = p_sub.add_parser("clear")
+    p_clear.add_argument("--field", required=True)
 
     args = parser.parse_args(argv)
-    if args.resource == "profile" and args.verb == "get":
+
+    if args.resource == "profile":
+        return _profile(args)
+    die(f"resource not implemented: {args.resource}")
+    return 2
+
+
+def _profile(args) -> int:
+    if args.verb == "get":
         sys.stdout.write(json.dumps(load("profile.json", {}), ensure_ascii=False, indent=2) + "\n")
         return 0
 
-    die(f"resource not implemented in scaffolding: {args.resource}")
-    return 2  # unreachable
+    if args.verb == "set":
+        patch = parse_json_arg(args.patch, "--patch")
+        if not isinstance(patch, dict):
+            die("--patch must be a JSON object")
+        with locked_write("profile.json") as state:
+            current = state["value"] or {}
+            state["value"] = deep_merge(current, patch)
+        sys.stdout.write(json.dumps(state["value"], ensure_ascii=False, indent=2) + "\n")
+        return 0
+
+    if args.verb == "clear":
+        with locked_write("profile.json") as state:
+            current = state["value"] or {}
+            clear_path(current, args.field)
+            state["value"] = current
+        sys.stdout.write(json.dumps(state["value"], ensure_ascii=False, indent=2) + "\n")
+        return 0
+
+    die(f"unknown verb: {args.verb}")
+    return 2
 
 
 if __name__ == "__main__":

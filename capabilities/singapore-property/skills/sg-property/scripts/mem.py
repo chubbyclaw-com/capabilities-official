@@ -32,6 +32,54 @@ from pathlib import Path
 from typing import Any
 
 
+# ---------- schema ----------
+
+# Lenient schema. Only known-field type mismatches are rejected. Unknown
+# fields pass with a stderr warning. Extend this dict to harden new fields.
+KNOWN_TYPES = {
+    "profile": {
+        "identity.nationality": str,
+        "identity.marital_status": str,
+        "identity.spouse_nationality": str,
+        "identity.household_size": int,
+        "identity.children": list,
+        "finance.monthly_income_sgd": (int, float),
+        "finance.household_income_sgd": (int, float),
+        "finance.monthly_debt_sgd": (int, float),
+        "finance.cpf_oa_sgd": (int, float),
+        "finance.cash_available_sgd": (int, float),
+        "ownership.private_count": int,
+        "ownership.hdb_count": int,
+        "ownership.owns_overseas": bool,
+        "preferences.budget_max_sgd": (int, float),
+        "preferences.bedrooms": list,
+        "preferences.districts_prefer": list,
+        "preferences.districts_avoid": list,
+        "preferences.segment": list,
+        "preferences.tenure_pref": str,
+        "preferences.must_haves": list,
+        "preferences.work_location": str,
+        "intent": str,
+        "notes": str,
+    },
+    "holdings": {
+        "id": str, "address": str, "type": str,
+        "purchase_date": str, "purchase_price_sgd": (int, float),
+        "current_loan_sgd": (int, float), "remaining_lease_years": (int, float),
+        "renovated_year": int, "intent": str, "notes": str,
+    },
+    "candidates": {
+        "id": str, "project_name": str, "address": str, "stage": str,
+        "asking_price_sgd": (int, float), "my_max_price_sgd": (int, float),
+        "estimated_value_sgd": (int, float),
+        "pros": list, "cons": list, "compared_with": list, "notes": str,
+    },
+    "clients": {
+        "id": str, "name": str, "role": str, "status": str, "notes": str,
+    },
+}
+
+
 # ---------- paths ----------
 
 def home() -> Path:
@@ -148,6 +196,39 @@ def parse_json_arg(raw: str, what: str):
         die(f"{what} must be valid JSON", detail=str(e))
 
 
+def _walk(obj, prefix: str = ""):
+    out = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            path = f"{prefix}.{k}" if prefix else k
+            if isinstance(v, dict):
+                out.extend(_walk(v, path))
+            else:
+                out.append((path, v))
+    return out
+
+
+def validate(scope: str, data: dict) -> None:
+    schema = KNOWN_TYPES.get(scope, {})
+    for path, value in _walk(data):
+        expected = schema.get(path)
+        if expected is None:
+            warn("unknown field", scope=scope, field=path)
+            continue
+        if value is None:
+            continue
+        types = expected if isinstance(expected, tuple) else (expected,)
+        # bool is an int subclass; reject when expected is int (not bool explicitly)
+        if isinstance(value, bool) and bool not in types and int in types:
+            type_names = "|".join(t.__name__ for t in types)
+            die(f"wrong type for {path}: expected {type_names}",
+                scope=scope, field=path, got_type="bool")
+        if not isinstance(value, types):
+            type_names = "|".join(t.__name__ for t in types)
+            die(f"wrong type for {path}: expected {type_names}",
+                scope=scope, field=path, got_type=type(value).__name__)
+
+
 # ---------- collection helpers ----------
 
 def slugify(text: str) -> str:
@@ -244,6 +325,7 @@ def _collection_handler(resource: str, args) -> int:
         for f in required:
             if not data.get(f):
                 die(f"required field missing: {f}", field=f)
+        validate(resource, data)
         if not data.get("id"):
             data["id"] = gen_id(str(data.get(required[0], resource)))
         with locked_write(fname) as state:
@@ -260,6 +342,7 @@ def _collection_handler(resource: str, args) -> int:
         patch = parse_json_arg(args.patch, "--patch")
         if not isinstance(patch, dict):
             die("--patch must be a JSON object")
+        validate(resource, patch)
         with locked_write(fname) as state:
             current = state["value"] or {key: []}
             items = current.get(key, [])
@@ -397,6 +480,7 @@ def _profile(args) -> int:
         patch = parse_json_arg(args.patch, "--patch")
         if not isinstance(patch, dict):
             die("--patch must be a JSON object")
+        validate("profile", patch)
         with locked_write("profile.json") as state:
             current = state["value"] or {}
             state["value"] = deep_merge(current, patch)
@@ -440,6 +524,7 @@ def _clients(args) -> int:
         for f in ("id", "name", "role"):
             if not data.get(f):
                 die(f"required field missing: {f}", field=f)
+        validate("clients", data)
         cpath = _client_path(data["id"])
         cpath.parent.mkdir(parents=True, exist_ok=True)
         if cpath.exists():
@@ -455,6 +540,7 @@ def _clients(args) -> int:
         patch = parse_json_arg(args.patch, "--patch")
         if not isinstance(patch, dict):
             die("--patch must be a JSON object")
+        validate("clients", patch)
         cpath = _client_path(args.id)
         if not cpath.exists():
             die("client not found", id=args.id)

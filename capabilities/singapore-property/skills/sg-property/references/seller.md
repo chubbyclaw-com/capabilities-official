@@ -79,7 +79,9 @@ that funds the next purchase.
 - Anchor on CMA median.
 - Survey live competition: `sgprop_search_projects --district <d>
   --segment private` (active listings need an external listing platform —
-  if not available, note the gap to the user).
+  if not available, note the gap to the user). Apply SKILL.md SOP §9
+  display rule — upcoming launches in the district are the most important
+  competitive signal and must be surfaced first.
 - Market temperature: count of `sgprop_transactions` in the last 3 / 6 /
   12 months. Cooling absorption + many launches → price below median.
 - Suggest one of: aggressive (set 2-3% above median for negotiation
@@ -93,6 +95,8 @@ When the user asks "now or wait":
 
 - Future supply: `sgprop_supply_outlook --near_address "<addr>"
   --years_ahead 2` — too many TOPs in the next 12-18 months = sell first.
+  Apply SKILL.md SOP §9 — name any upcoming projects in the results
+  explicitly; state if none found.
 - Mortgage rate trajectory and TDSR — fewer buyers can afford if rates
   rise.
 - SSD window: if they bought < 3 years ago, often worth waiting out the

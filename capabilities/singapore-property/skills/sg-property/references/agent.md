@@ -69,7 +69,8 @@ When the agent says "5 clients, $2-3m, family upgrade":
 4. Score each project against each client (district match, school match,
    price band).
 5. Output a matrix: clients × top 5 projects with green/yellow/red
-   indicators.
+   indicators. Sort matrix rows so upcoming/new_launch/preview projects
+   appear first — see SKILL.md SOP §9 (batch-matching matrix exception).
 
 ## 5. CMA report generation
 
@@ -160,6 +161,9 @@ Agents working a new launch want to monitor take-up:
 sgprop_search_projects --status new_launch --district <d>
 sgprop_project_report --project "<name>" --sections new_launch_progress,transactions
 ```
+
+Apply SKILL.md SOP §9 display rule when presenting results — upcoming
+projects must be in a dedicated top section.
 
 Compare take-up rate to peers; surface to the agent for client
 discussions ("project A is 80% sold in 4 months, project B is 30% in 8

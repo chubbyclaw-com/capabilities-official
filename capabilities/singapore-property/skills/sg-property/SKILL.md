@@ -107,17 +107,37 @@ references freely as the conversation evolves.
 
 ### 9. Search result display (HARD)
 
-Applies whenever `sgprop_search_projects` or `sgprop_supply_outlook`
-returns results — regardless of role (buyer, seller, agent).
+Applies whenever `sgprop_search_projects`, `sgprop_supply_outlook`, or
+`sgprop_project_report` returns data that includes nearby or listed
+projects — regardless of role (buyer, seller, agent), and including
+school-catchment filtered calls and single-candidate deep-dive calls.
+
+**Standard layout (all roles except agent batch-matching):**
 
 1. **Upcoming / new launch first** — any project with `status` of
    `upcoming`, `new_launch`, or `preview` must appear in its own
-   clearly-labelled section at the top of the reply (e.g.
-   "即将推出 / New launches"). Never merge these into a combined table
-   with completed or resale projects.
-2. **Completed / resale second** — separate section below.
-3. **Explicitly state when none found** — if no upcoming projects are
-   in the results, say so. Do not stay silent.
+   clearly-labelled section at the top of the reply (use the heading
+   "即将推出 / New launches nearby"). Never merge these into a combined
+   table with completed or resale projects. This applies even when only
+   one upcoming project is found.
+2. **Completed / resale second** — separate section below. Statuses
+   `completed`, `resale`, `sold_out`, `TOP_issued` belong here. For
+   any ambiguous status (e.g. `under_construction`, `TOP_pending`),
+   place in this section and note the status parenthetically.
+3. **Explicitly state when none found** — if no projects with an
+   upcoming status are in the results, write "附近暂无即将推出的新项目"
+   (or English equivalent). Do not stay silent.
+
+**Aggregate supply data** — if `sgprop_supply_outlook` returns totals
+or counts rather than per-project records with `status` fields, name
+any specific upcoming projects mentioned in the narrative and apply the
+section heading to them. If none are named, state so explicitly.
+
+**Agent batch-matching matrix exception** — when producing the
+clients × projects matrix (agent.md §4), sort matrix rows so
+upcoming/new_launch/preview projects appear at the top of the matrix
+before completed projects. Row-ordering substitutes for the
+separate-section requirement in this format.
 
 Rationale: upcoming projects are the highest-value signal across all
 three workflows — the buy-side opportunity the user doesn't yet know

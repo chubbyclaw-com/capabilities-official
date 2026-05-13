@@ -49,23 +49,6 @@ sgprop_search_projects --segment private --district 15,16 \
   --near_school_km 1 --school_name "Nanyang Primary"
 ```
 
-**Result display rule (HARD):** After receiving results, immediately
-partition by `status` before composing your reply:
-
-1. **Upcoming / new launch first** — any project with `status` of
-   `upcoming`, `new_launch`, or `preview` must appear in its own
-   section at the top of the reply, labelled clearly (e.g.
-   "即将推出 / New launches nearby"). Never bury these in a combined
-   table with completed projects.
-2. **Completed / resale second** — list in a separate section below.
-3. **If no upcoming projects found**, explicitly state that fact so the
-   user knows you checked. Do not stay silent on this.
-
-This rule fires on every `sgprop_search_projects` call, including
-school-catchment and supply-outlook searches. The user's
-highest-value information is usually the upcoming project they do not
-yet know about — surface it immediately.
-
 For each candidate the user wants to track, add it:
 
 ```bash

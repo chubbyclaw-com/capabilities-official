@@ -105,6 +105,26 @@ references freely as the conversation evolves.
   walking time.
 - Dates in ISO `YYYY-MM-DD` (or `YYYY-MM` where the day is unknown).
 
+### 9. Search result display (HARD)
+
+Applies whenever `sgprop_search_projects` or `sgprop_supply_outlook`
+returns results — regardless of role (buyer, seller, agent).
+
+1. **Upcoming / new launch first** — any project with `status` of
+   `upcoming`, `new_launch`, or `preview` must appear in its own
+   clearly-labelled section at the top of the reply (e.g.
+   "即将推出 / New launches"). Never merge these into a combined table
+   with completed or resale projects.
+2. **Completed / resale second** — separate section below.
+3. **Explicitly state when none found** — if no upcoming projects are
+   in the results, say so. Do not stay silent.
+
+Rationale: upcoming projects are the highest-value signal across all
+three workflows — the buy-side opportunity the user doesn't yet know
+about, the new supply pressure a seller must price around, the launch
+inventory an agent needs to brief clients on. Burying them in a flat
+list is a material omission.
+
 ## Typical opening lines
 
 - Buyer: "外籍人士在新加坡能买什么", "我看上 D15 一个 3BR 想出价",

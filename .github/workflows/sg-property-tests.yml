@@ -1,0 +1,24 @@
+name: sg-property tests
+
+on:
+  push:
+    paths:
+      - 'capabilities/singapore-property/**'
+      - '.github/workflows/sg-property-tests.yml'
+  pull_request:
+    paths:
+      - 'capabilities/singapore-property/**'
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+      - name: Run tests
+        working-directory: capabilities/singapore-property/skills/sg-property
+        run: python -m pytest scripts/tests/ -v

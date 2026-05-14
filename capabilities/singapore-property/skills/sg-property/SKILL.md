@@ -58,6 +58,9 @@ references freely as the conversation evolves.
     count, monthly income, monthly debt — needed for ABSD + TDSR.
   - "Find me a 3BR" → ask budget, preferred districts, commute, school
     preference, segment.
+- For structured fields (nationality, residency status, marital status, segment,
+  district, HDB/private ownership), use `AskUserQuestion` tool with
+  multiple-choice options — do **not** ask these as free-form text.
 - After the user answers, immediately persist with `mem.py profile set
   --patch '<json>'`.
 - Every field is optional. If the user prefers not to share, give a

@@ -1,5 +1,4 @@
-"""Shared fixtures: every test gets a clean SGPROP_HOME pointing at a tmp dir."""
-import os
+"""Shared fixtures for calc_*.py script tests."""
 import subprocess
 import sys
 from pathlib import Path
@@ -10,14 +9,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture
-def sgprop_home(tmp_path, monkeypatch):
-    home = tmp_path / "sgprop"
-    monkeypatch.setenv("SGPROP_HOME", str(home))
-    return home
-
-
-@pytest.fixture
-def run_script(sgprop_home):
+def run_script():
     """Invoke a script with stdin/argv. Returns (returncode, stdout, stderr)."""
 
     def _run(script_name, *args, stdin=""):
@@ -27,7 +19,6 @@ def run_script(sgprop_home):
             input=stdin,
             capture_output=True,
             text=True,
-            env={**os.environ, "SGPROP_HOME": str(sgprop_home)},
         )
         return result.returncode, result.stdout, result.stderr
 

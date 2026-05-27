@@ -6,56 +6,96 @@ record.
 
 ## 1. Client onboarding
 
-`python3 scripts/mem.py clients list` — see existing clients.
+`MemorySearch("sgprop:client")` — see existing clients.
 
-For a new client:
+For a new client, write a `sgprop:client` record:
 
-```bash
-python3 scripts/mem.py clients create --data '{
-  "id": "tan-2026-05-08",
-  "name": "Mr Tan",
-  "role": "buyer",
-  "status": "qualifying"
-}'
+```
+MemoryWrite(value="""sgprop:client | tan-2026-05-08 | Mr Tan
+
+role: buyer
+status: qualifying
+
+```json
+{"client_id":"tan-2026-05-08","name":"Mr Tan","role":"buyer",
+ "status":"qualifying"}
+```
+""")
 ```
 
-`id` should be slug-safe (lowercase letters, digits, hyphens). A typical
-pattern is `<surname>-<YYYY-MM-DD>`.
+`client_id` should be slug-safe (lowercase letters, digits, hyphens). A
+typical pattern is `<surname>-<YYYY-MM-DD>`. Always echo `client_id` and
+name in the header so MetaGen captures them as keywords.
 
 `role` is one of: `buyer`, `seller`, `both`.
 
 ## 2. Per-client profile + holdings + candidates
 
-Every `mem.py holdings ...` and `mem.py candidates ...` command accepts a
-`--client <id>` flag that scopes the operation to the client's file
-instead of the user's global memory.
+Client-scoped data lives in **separate** memory records — not packed into
+the `sgprop:client` header. Use the dedicated kinds:
 
-```bash
+- `sgprop:client-holding` — a property the client owns
+- `sgprop:client-candidate` — a property the client is evaluating
+
+Always echo the `client_id` in the header so future searches by client
+work.
+
+```
 # Client's existing holding (for upgrade work)
-python3 scripts/mem.py holdings add --client tan-2026-05-08 --data '{
-  "address": "Block 123 Tampines St 11 #08-12",
-  "type": "hdb",
-  "purchase_date": "2015-04",
-  "purchase_price_sgd": 480000
-}'
+MemoryWrite(value="""sgprop:client-holding | tan-2026-05-08 | Block 123 Tampines St 11 #08-12
 
-# Client's candidate
-python3 scripts/mem.py candidates add --client tan-2026-05-08 --data '{
-  "project_name": "Bedok South Residences",
-  "stage": "shortlist"
-}'
+type: hdb
+purchase_date: 2015-04
+purchase_price_sgd: 480000
+
+```json
+{"client_id":"tan-2026-05-08",
+ "address":"Block 123 Tampines St 11 #08-12","type":"hdb",
+ "purchase_date":"2015-04","purchase_price_sgd":480000}
+```
+""")
 ```
 
-Profile fields (income / nationality / preferences) live in the
-`profile` substructure of the client file. Update it via
-`mem.py clients update --id <client-id> --patch '{"profile":{...}}'`.
+```
+# Client's candidate
+MemoryWrite(value="""sgprop:client-candidate | tan-2026-05-08 | Bedok South Residences
+
+stage: shortlist
+
+```json
+{"client_id":"tan-2026-05-08","project_name":"Bedok South Residences",
+ "stage":"shortlist"}
+```
+""")
+```
+
+Profile fields (income / nationality / preferences) live inside the
+`profile` substructure of the `sgprop:client` record. Update them via the
+client update protocol: `MemorySearch("sgprop:client tan-2026-05-08")` →
+`MemoryGet(id)` → merge `profile.<field>` into JSON → `MemoryWrite`
+new envelope → `MemoryDelete(old id)`.
+
+To list everything for a client:
+
+- `MemorySearch("tan-2026-05-08")` returns the client header plus every
+  `client-holding` / `client-candidate` / `viewing` / `offer` / `note`
+  that mentions the client_id (MetaGen will have indexed those records).
+  Then `MemoryGet(id)` the ones you need.
 
 ## 3. Client requirement gathering
 
 - For buyer clients, work through the buyer workflow
-  (`references/buyer.md`) but persist everything under `--client <id>`.
+  (`references/buyer.md`), but **swap each record kind for its
+  client-scoped equivalent**:
+  - `sgprop:profile` (in the user workflow) → `profile` field inside the
+    `sgprop:client` record
+  - `sgprop:candidate` → `sgprop:client-candidate` (with `client_id`)
+  - `sgprop:viewing` / `sgprop:offer` / `sgprop:note` → still as
+    independent records, but set `parent_kind: "client-candidate"` and
+    write `<client_id> | <project>` in the header
 - For seller clients, work through the seller workflow
-  (`references/seller.md`) similarly.
+  (`references/seller.md`) with the same swap:
+  - `sgprop:holding` → `sgprop:client-holding`
 - For `role: both`, sequence: settle the sell side first (cash + ABSD
   refund timing), then the buy side.
 
@@ -63,8 +103,9 @@ Profile fields (income / nationality / preferences) live in the
 
 When the agent says "5 clients, $2-3m, family upgrade":
 
-1. `mem.py clients list` to find clients with that profile.
-2. For each, read their `preferences` from the client file.
+1. `MemorySearch("sgprop:client")` to find clients.
+2. For each, `MemoryGet(id)` to read their `profile.preferences` from the
+   client JSON body.
 3. Run a single `sgprop_search_projects` with the union of constraints.
 4. Score each project against each client (district match, school match,
    price band).
@@ -142,16 +183,16 @@ Status progression for a client:
 `qualifying → viewing → offer → closed`
 `qualifying → dropped` (cold-cancelled)
 
-Update via `mem.py clients update --id <id> --patch '{"status":"viewing"}'`.
+Update `status` with the client update protocol: Search → Get → merge
+`status` → Write → Delete old.
 
 A weekly funnel report:
 
-```bash
-python3 scripts/mem.py clients list
-```
-
-Group by status, count, and surface stale ones (no `updated_at` change in
-> 14 days — chase up).
+- `MemorySearch("sgprop:client")` (raise `limit` if you have many clients).
+- `MemoryGet(id)` each to read `status` and the platform record's
+  `updated_at`.
+- Group by status, count, and surface stale ones (`updated_at` not changed
+  in > 14 days — chase up).
 
 ## 8. New launch tracking
 
@@ -190,8 +231,11 @@ agent to pitch to clients.
 ## Tips
 
 - Always store the agent's own profile (commission rates, agency contact)
-  in `profile.json` — saves them retyping.
-- Use `mem.py notes append --target clients --client <id> --text "..."`
-  liberally; the per-client file becomes a chat-friendly journal.
-- Respect PDPA: client memory files are local and private. Don't paste
-  them into external services.
+  in a `sgprop:profile` record — saves them retyping.
+- Use `sgprop:note` records (one per observation, with
+  `parent_kind: "client"` and `parent_id: <client_id>` in the JSON body)
+  liberally; the search history then becomes a chat-friendly per-client
+  journal.
+- Respect PDPA: client memory is platform-encrypted and `scope=user`
+  (agent-private). Do **not** write client data to `scope=chatgroup` and
+  do not paste it into external services.

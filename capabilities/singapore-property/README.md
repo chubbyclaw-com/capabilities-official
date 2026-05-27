@@ -13,15 +13,15 @@ Singapore residential property decision assistant. Three role-aware workflows (b
 - The skill router (`skills/sg-property/SKILL.md`) detects which role applies and pulls in the right reference.
 - Data queries go through the `sgprop` MCP tools (`sgprop_search_projects`, `sgprop_project_report`, `sgprop_transactions`, `sgprop_supply_outlook`, `sgprop_location_context`).
 - Tax / loan / yield computations use deterministic Python scripts under `skills/sg-property/scripts/`.
-- Personal data (`profile`, `holdings`, `candidates`, `clients`) is persisted under `~/.config/sgprop/` via the `mem.py` CLI — never written directly.
+- Personal data (`profile`, `holding`, `candidate`, `client`, viewings, offers, notes) is persisted via the ChubbyClaw platform's native memory tools (`MemoryWrite / MemoryGet / MemorySearch / MemoryList / MemoryDelete`). Default `scope=user`; see `skills/sg-property/references/memory-conventions.md` for the record envelope and update protocol.
 
 ## Requirements
 
-- `python3` 3.10+ on PATH
+- `python3` 3.10+ on PATH (only needed when running the `calc_*.py` scripts)
 - ChubbyClaw account with access to `https://chubbyclaw.com/mcp/sgprop`
 
 ## Privacy
 
-Memory files store financial and identity data (income, CPF, NRIC nationality, addresses). They are written with `0600` permissions and never sent to any external service. v1 does not encrypt them — keep your machine secure.
+Personal data (income, CPF, NRIC nationality, addresses, clients) is stored in the ChubbyClaw platform memory store: AES-256-GCM at rest with a per-subject DEK, `scope=user` so only you can read it, and crypto-shred on account or group deletion. Skills never write `scope=chatgroup` without an explicit user request, and only the group owner can write group-level memory.
 
 See `../../docs/superpowers/specs/2026-05-04-sg-property-design.md` for the full design.

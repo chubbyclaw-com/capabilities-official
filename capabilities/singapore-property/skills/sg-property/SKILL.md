@@ -16,7 +16,9 @@ router; role-specific SOPs live under `references/`.
    - `references/seller.md` — for "I want to sell / what's my place worth / when to list"
    - `references/agent.md` — for agents managing multiple clients (CMA reports, batch matching, viewings)
 3. **Read other references on demand:**
-   - `references/memory-schema.md` — when adding/updating profile, holdings, candidates, or clients
+   - `references/memory-conventions.md` — whenever you read or write any
+     persistent state via `MemoryWrite / MemoryGet / MemorySearch /
+     MemoryList / MemoryDelete`
    - `references/calc-rules.md` — when calling any `calc_*.py`
 4. **Follow the public SOP below** in every interaction regardless of role.
 
@@ -34,20 +36,20 @@ references freely as the conversation evolves.
 
 ## Public SOP (applies to every role)
 
-### 1. Environment check (first turn only)
+### 1. Environment check (lazy)
 
-- Run `python3 --version`. If < 3.10, tell the user; everything below assumes
-  python3 is on PATH.
-- Confirm the scripts directory is reachable: `ls "$(dirname "$0")/scripts"`
-  (the user will have installed the capability — paths resolve relative to
-  this skill's directory).
+- Tax / loan / yield numbers come from `scripts/calc_*.py`. The first time
+  you need to call one in a session, confirm `python3 --version` is ≥ 3.10
+  and the script is reachable; surface a clear error to the user if not.
+- Memory is platform-native (`MemoryWrite / MemoryGet / MemorySearch /
+  MemoryList / MemoryDelete`) — no environment check needed.
 
 ### 2. Look before you ask
 
-- Always run `python3 scripts/mem.py profile get` at the start of a session
-  (or once per role switch) before asking the user anything. If the profile
-  already contains the answer, do not re-ask.
-- For agents, also run `python3 scripts/mem.py clients list` to surface known
+- At the start of a session (or once per role switch), call
+  `MemorySearch("sgprop:profile")` before asking the user anything. If a
+  hit comes back, `MemoryGet` it and use the stored fields; do not re-ask.
+- For agents, also call `MemorySearch("sgprop:client")` to surface known
   clients.
 
 ### 3. Progressive profile filling
@@ -61,21 +63,38 @@ references freely as the conversation evolves.
 - For structured fields (nationality, residency status, marital status, segment,
   district, HDB/private ownership), use `AskUserQuestion` tool with
   multiple-choice options — do **not** ask these as free-form text.
-- After the user answers, immediately persist with `mem.py profile set
-  --patch '<json>'`.
+- After the user answers, persist immediately by **updating** the profile
+  memory: `MemorySearch("sgprop:profile")` → `MemoryGet(id)` → merge the
+  new fields → `MemoryWrite(<new envelope>)` → `MemoryDelete(<old id>)`.
+  If no profile exists yet, skip Search/Get/Delete and just `MemoryWrite`.
+  See `references/memory-conventions.md` for the envelope shape and the
+  full update protocol.
 - Every field is optional. If the user prefers not to share, give a
   conservative estimate explicitly labelled "未知 — 按 X 假设" and do **not**
   write that value into memory.
-- Vague or unstable values ("差不多两百万吧") go to `notes`, not into
-  structured fields.
+- Vague or unstable values ("差不多两百万吧") go to the `notes` field of the
+  parent record (or a separate `sgprop:note`), not into structured fields.
 
 ### 4. Memory access rules (HARD)
 
-- Read or write memory **only** through `python3 scripts/mem.py`. The CLI
-  enforces atomic writes, file locks, and schema validation.
-- Never use the `Write` tool on `~/.config/sgprop/*.json`. Read-only `Read`
-  is acceptable for debugging if the user asks.
-- See `references/memory-schema.md` for the field reference.
+- Read or write persistent state **only** through the platform
+  `Memory*` tools. Do **not** invent local file storage (`~/.config/...`,
+  `Write` to disk, etc.) for any sgprop data.
+- Every `MemoryWrite` `value` must lead with the
+  `sgprop:<kind> | <identifier>` header line so MetaGen produces useful
+  keywords — see `references/memory-conventions.md` for the record envelope
+  and per-kind templates.
+- Default to `scope=user` (rely on the platform default; do not pass
+  `scope` unless overriding). Only use `scope=chatgroup` when the user is
+  in a group chat **and** explicitly asks to share, **and** has been warned
+  that only the group owner can write and all members can read.
+- Sensitive fields (income, CPF balance, NRIC / nationality) write to
+  `scope=user` only. Confirm with the user before persisting if the
+  conversation context is a group chat.
+- There is no upsert. Use the Search → Get → merge → Write → Delete
+  protocol for edits, and write independent event records (`sgprop:viewing`,
+  `sgprop:offer`, `sgprop:note`) for new occurrences. See
+  `references/memory-conventions.md`.
 
 ### 5. Policy math rules (HARD)
 
@@ -98,8 +117,9 @@ references freely as the conversation evolves.
 ### 7. Conflicting values
 
 - If the user gives a new value that contradicts something already in
-  memory, ask: "Update the existing record, or add a new one?" before
-  writing. Don't overwrite silently.
+  memory, follow the conflict protocol in `references/memory-conventions.md`:
+  Search → Get, restate the diff to the user, ask "覆盖 / 追加新条 / 保留
+  旧值",  then apply the answer. Never overwrite silently.
 
 ### 8. Currency, units, dates
 
@@ -162,4 +182,3 @@ list is a material omission.
   use `sgprop_search_projects --segment hdb_resale`.
 - No automatic bidding / signing. Decision support only.
 - No commercial / industrial / overseas property.
-- Memory files are not encrypted; user is responsible for machine security.

@@ -4,8 +4,9 @@ Use this reference when the user wants to value, list, or sell their place.
 
 ## 1. Capture the holding
 
-`python3 scripts/mem.py holdings list` — see what's known. If empty or the
-user is asking about a different unit, ask:
+`MemorySearch("sgprop:holding")` — see what's known. If a hit comes back,
+`MemoryGet(id)` to read the stored fields. If empty or the user is asking
+about a different unit, ask:
 
 - address (block + unit number)
 - type: private / hdb
@@ -16,19 +17,27 @@ user is asking about a different unit, ask:
 - intent: `sell` (for an active listing) or `enbloc_wait` / `hold` (for
   passive exit planning)
 
-Persist:
+Persist by writing a new `sgprop:holding` record:
 
-```bash
-python3 scripts/mem.py holdings add --data '{
-  "address": "Marine Blue #18-05",
-  "type": "private",
-  "purchase_date": "2019-08",
-  "purchase_price_sgd": 1380000,
-  "current_loan_sgd": 720000,
-  "remaining_lease_years": 86,
-  "intent": "sell"
-}'
 ```
+MemoryWrite(value="""sgprop:holding | Marine Blue #18-05
+
+type: private
+purchase_date: 2019-08
+purchase_price_sgd: 1380000
+current_loan_sgd: 720000
+remaining_lease_years: 86
+intent: sell
+
+```json
+{"address":"Marine Blue #18-05","type":"private","purchase_date":"2019-08",
+ "purchase_price_sgd":1380000,"current_loan_sgd":720000,
+ "remaining_lease_years":86,"intent":"sell"}
+```
+""")
+```
+
+(Full envelope shape in `references/memory-conventions.md`.)
 
 ## 2. CMA valuation
 
@@ -87,7 +96,10 @@ that funds the next purchase.
 - Suggest one of: aggressive (set 2-3% above median for negotiation
   buffer), market (median), quick (2-5% below median).
 
-Persist with `mem.py holdings update --id <id> --patch '{"sales":{"listing_price_sgd":...}}'`.
+Persist the chosen `listing_price_sgd` (and the rest of the `sales`
+substructure) with the update protocol: `MemorySearch("sgprop:holding
+<address>")` → `MemoryGet(id)` → merge `sales.listing_price_sgd` →
+`MemoryWrite` new envelope → `MemoryDelete(old id)`.
 
 ## 5. Timing decision
 
@@ -120,28 +132,49 @@ owner consent.
 
 ## 7. Listing tracker
 
-When the unit goes live, update the `sales` substructure on every
-material event:
+Once the unit goes live, treat events as independent records — do **not**
+keep mutating a packed `sales.viewings[]` / `sales.offers[]` array on the
+holding.
 
-```bash
-python3 scripts/mem.py holdings update --id my-marine-blue --patch '{
-  "sales": { "listed_date": "2026-05-09", "status": "live" }
-}'
+Set the listing live by updating the holding's `sales.status` and
+`sales.listed_date` via the update protocol:
 
-# log a viewing
-python3 scripts/mem.py holdings update --id my-marine-blue --patch '{
-  "sales": { "viewings": [{"date":"2026-05-12","outcome":"interested"}] }
-}'
+`MemorySearch("sgprop:holding Marine Blue #18-05")` → `MemoryGet(id)` →
+merge `sales.listed_date = "2026-05-09"`, `sales.status = "live"` →
+`MemoryWrite(new envelope)` → `MemoryDelete(old id)`.
 
-# log an offer
-python3 scripts/mem.py holdings update --id my-marine-blue --patch '{
-  "sales": { "offers": [{"date":"2026-05-15","amount":1830000,"status":"rejected"}] }
-}'
+Then, for each viewing / offer:
+
+```
+MemoryWrite(value="""sgprop:viewing | Marine Blue #18-05 | 2026-05-12
+
+outcome: interested
+attendees: 2
+
+```json
+{"parent_kind":"holding","parent_id":"Marine Blue #18-05",
+ "date":"2026-05-12","outcome":"interested","attendees":2}
+```
+""")
 ```
 
-(If the user wants the new viewing/offer *appended* and not overwritten,
-do a `mem.py holdings get --id ...` first, merge in code, and pass the
-full updated array.)
+```
+MemoryWrite(value="""sgprop:offer | Marine Blue #18-05 | 2026-05-15
+
+amount_sgd: 1830000
+status: rejected
+
+```json
+{"parent_kind":"holding","parent_id":"Marine Blue #18-05",
+ "date":"2026-05-15","amount_sgd":1830000,"status":"rejected"}
+```
+""")
+```
+
+To review the listing history: `MemorySearch("sgprop:viewing Marine Blue
+#18-05")` and `MemorySearch("sgprop:offer Marine Blue #18-05")`, then
+`MemoryGet` each hit and assemble the timeline in the reply. Independent
+records keep appends conflict-free.
 
 ## 8. Upgrade chain
 

@@ -7,14 +7,20 @@ ordered, but skip ahead when the user already has the answer.
 
 **Goal:** know how much they can spend and what taxes apply before browsing.
 
-1. `python3 scripts/mem.py profile get` to see what is already known.
+1. `MemorySearch("sgprop:profile")` to see what is already known; if a hit
+   comes back, `MemoryGet(id)` to read the stored fields.
 2. Ask only the missing fields needed for ABSD + TDSR (or MSR for
    HDB/EC):
    - `nationality`, `marital_status`, `spouse_nationality` (if married),
      `ownership.private_count` + `ownership.hdb_count`
    - `finance.monthly_income_sgd`, `finance.monthly_debt_sgd`,
      `finance.cpf_oa_sgd`, `finance.cash_available_sgd`
-3. Persist each answer with `mem.py profile set` immediately.
+3. Persist each answer immediately using the profile update protocol:
+   `MemorySearch("sgprop:profile")` → `MemoryGet(id)` → merge → `MemoryWrite`
+   the new envelope → `MemoryDelete(old id)`. If no profile exists yet,
+   skip the Search/Get/Delete and just `MemoryWrite` a fresh
+   `sgprop:profile` envelope (see `references/memory-conventions.md` for the
+   shape and the full Search→Get→merge→Write→Delete protocol).
 4. Compute caps:
    - `echo '{...}' | python3 scripts/calc_tdsr.py` → max loan
    - For HDB / EC also run `calc_msr.py`
@@ -35,8 +41,10 @@ Ask the questions that narrow the search space:
 - tenure preference (freehold / 99yr / either)?
 - must-haves and nice-to-haves?
 
-Persist via `mem.py profile set --patch '{"preferences":{...}}'`. Tag
-unstable wishes (e.g. "near a park I like") into `notes`.
+Persist by running the profile update protocol again (Search → Get →
+merge new `preferences` block → Write → Delete old). Tag unstable wishes
+(e.g. "near a park I like") into the profile's `notes` field, or write a
+free-standing `sgprop:note` if it's verbose.
 
 ## 3. Project shortlist
 
@@ -49,16 +57,25 @@ sgprop_search_projects --segment private --district 15,16 \
   --near_school_km 1 --school_name "Nanyang Primary"
 ```
 
-For each candidate the user wants to track, add it:
+For each candidate the user wants to track, write a `sgprop:candidate`
+record:
 
-```bash
-python3 scripts/mem.py candidates add --data '{
-  "project_name": "Stirling Residences",
-  "address": "Stirling Rd",
-  "stage": "shortlist",
-  "asking_price_sgd": 2350000
-}'
 ```
+MemoryWrite(value="""sgprop:candidate | Stirling Residences | 2026-05
+
+address: Stirling Rd
+stage: shortlist
+asking_price_sgd: 2350000
+
+```json
+{"project_name":"Stirling Residences","address":"Stirling Rd",
+ "stage":"shortlist","asking_price_sgd":2350000}
+```
+""")
+```
+
+(Full envelope shape and identifier rules in
+`references/memory-conventions.md`.)
 
 ## 4. Candidate deep dive
 
@@ -71,15 +88,13 @@ Per candidate:
 3. `sgprop_supply_outlook --near_address "..." --years_ahead 5` — flag
    potential supply pressure.
 
-Update the candidate with what you learn:
+Update the candidate with what you learn using the update protocol:
 
-```bash
-python3 scripts/mem.py candidates update --id <cid> --patch '{
-  "estimated_value_sgd": 2280000,
-  "pros": ["1km Henry Park Pri", "MRT 7min"],
-  "cons": ["west sun"]
-}'
-```
+1. `MemorySearch("sgprop:candidate Stirling Residences")` → grab the id
+2. `MemoryGet(id)` → parse the JSON body
+3. Merge `estimated_value_sgd`, `pros`, `cons` into the JSON
+4. `MemoryWrite(<new envelope>)`
+5. `MemoryDelete(<old id>)`
 
 ## 5. Valuation & negotiation
 
@@ -96,8 +111,8 @@ Report median PSF / price for the comparable cohort, flag any outliers.
 Suggest an offer relative to median (e.g. "median PSF 2,100 → 980 sqft ≈
 $2.06m; current asking $2.35m looks ~12% above median").
 
-Set `my_max_price_sgd` on the candidate after agreeing on the ceiling with
-the user.
+Set `my_max_price_sgd` on the candidate (via the update protocol) after
+agreeing on the ceiling with the user.
 
 ## 6. Risk dilligence
 
@@ -124,19 +139,28 @@ Show all components, then a single bottom-line "all-in cost over 5 years".
 
 ## 8. Stage advancement
 
-When the user views, makes an offer, or closes:
+Stage progresses along `shortlist → viewing_scheduled → viewed → offered
+→ {declined | closed}`.
 
-```bash
-python3 scripts/mem.py candidates advance-stage --id <cid>
-# or, to jump:
-python3 scripts/mem.py candidates advance-stage --id <cid> --stage offered
+When the user views, makes an offer, or closes, advance the `stage` field
+via the update protocol (Search → Get → merge `stage` → Write → Delete
+old). Then, for the event itself, write an independent record:
+
+- Viewing → `sgprop:viewing` (template in `references/memory-conventions.md`)
+- Offer → `sgprop:offer`
+
+Drop a free-text note as its own record:
+
 ```
+MemoryWrite(value="""sgprop:note | candidate | Stirling Residences
 
-Drop a note for context:
+text: viewed 2026-05-10; agent quoted $2.32m floor
 
-```bash
-python3 scripts/mem.py notes append --target candidates --id <cid> \
-  --text "viewed 2026-05-10; agent quoted $2.32m floor"
+```json
+{"parent_kind":"candidate","parent_id":"Stirling Residences",
+ "text":"viewed 2026-05-10; agent quoted $2.32m floor","date":"2026-05-10"}
+```
+""")
 ```
 
 ## Common pitfalls to flag to the user

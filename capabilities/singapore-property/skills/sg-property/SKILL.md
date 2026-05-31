@@ -28,7 +28,7 @@ router; role-specific SOPs live under `references/`.
 |------------------|------|--------|
 | 买 / 看房 / new launch / 投资公寓 / 自住 / 外籍人士能买 / 我能买二套 / 预算 / 找个 X BR | buyer | Read `references/buyer.md` |
 | 卖 / 挂牌 / 我家这套 / CMA / SSD / 换房 / 现在卖还是再持 | seller | Read `references/seller.md` |
-| 客户 / 带看 / 客户漏斗 / 帮 X 先生看 / 中介 / 开单 | agent | Read `references/agent.md` |
+| 客户 / 带看 / 客户漏斗 / 帮 X 先生看 / 中介 / 开单 / client / my client / got a client / for a client / 帮客户找 | agent | Read `references/agent.md` |
 
 If the user mixes roles (e.g. "I want to sell my current place to upgrade"),
 ask which side they want to start with, then load that reference. Switch
@@ -74,6 +74,27 @@ references freely as the conversation evolves.
   write that value into memory.
 - Vague or unstable values ("差不多两百万吧") go to the `notes` field of the
   parent record (or a separate `sgprop:note`), not into structured fields.
+
+### 3a. Capture clients proactively (agent — HARD)
+
+- When the user acts as an agent and **mentions a client** — even in
+  passing, even **without** an explicit "remember / keep track / 记一下 /
+  帮我存" (e.g. "got a client wants Tampines 1.5m", "帮一个客户看看 D15 的
+  3BR", "my client is selling his HDB") — treat it as **client onboarding**,
+  not a throwaway query.
+- Persist the client **before or alongside** any search: write/update a
+  `sgprop:client` record, and capture the stated requirement as a
+  `sgprop:client-candidate` (buyer) or `sgprop:client-holding` (seller), or
+  into `profile.preferences`. Follow `references/agent.md` §1. Do **not**
+  wait for the user to ask you to save.
+- First `MemorySearch("sgprop:client")` to avoid duplicating an existing
+  client (match by name / area / requirement); update rather than re-add.
+- If the client's name is not given yet, mint a placeholder `client_id`
+  (e.g. `client-<area>-YYYY-MM-DD`) and onboard now; ask for the name once
+  you've shown first results, then rename via the update protocol.
+- This only applies to the agent role. For buyer/seller (the user's own
+  search), keep following §3 — persist the user's own `sgprop:profile`,
+  not a client record.
 
 ### 4. Memory access rules (HARD)
 

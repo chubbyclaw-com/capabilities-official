@@ -6,7 +6,17 @@ record.
 
 ## 1. Client onboarding
 
-`MemorySearch("sgprop:client")` — see existing clients.
+**Trigger — do this proactively (HARD).** The moment the user mentions a
+client — even in passing, even without saying "remember / keep track /
+记一下" (e.g. "got a client wants Tampines 1.5m", "帮一个客户看 D15 3BR",
+"my client is selling his HDB") — onboard them. Persist the client
+**before or alongside** any search; never treat a client mention as a
+throwaway query. Capturing the stated requirement is part of onboarding —
+also write a `sgprop:client-candidate` (buyer) / `sgprop:client-holding`
+(seller), or fill `profile.preferences`. See SKILL.md SOP §3a.
+
+`MemorySearch("sgprop:client")` — first check whether this client already
+exists (match by name / area / requirement); update rather than duplicate.
 
 For a new client, write a `sgprop:client` record:
 

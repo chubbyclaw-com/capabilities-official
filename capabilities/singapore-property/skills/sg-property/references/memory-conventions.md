@@ -2,25 +2,26 @@
 
 All `sgprop` persistent state lives in the ChubbyClaw platform memory store,
 accessed via the native `MemoryWrite / MemoryGet / MemorySearch / MemoryList /
-MemoryDelete` tools. There is **no** local `~/.config/sgprop` directory and
-no `mem.py` CLI any more — those were removed when we moved to the platform
-memory tool.
+MemoryUpdate / MemoryDelete` tools. There is **no** local `~/.config/sgprop`
+directory and no `mem.py` CLI any more — those were removed when we moved to
+the platform memory tool.
 
 Platform contract (excerpt of `chubbyclaw/docs/design/14-memory-system.md`):
 
 | Item | Value |
 |------|-------|
-| Tools | `MemoryWrite(value, scope?, expires_in_days?)`, `MemoryGet(id)`, `MemorySearch(query, limit?)`, `MemoryList(limit?)`, `MemoryDelete(id)` |
+| Tools | `MemoryWrite(value, scope?, expires_in_days?)`, `MemoryGet(id)`, `MemorySearch(query, limit?)`, `MemoryList(limit?)`, `MemoryUpdate(id, value)`, `MemoryDelete(id)` |
 | `scope` | `user` (default) or `chatgroup` — server-injected `subject_type / subject_id / actor` cannot be set by the model |
 | `value` | Plaintext ≤ 8 KB; encrypted at rest with a per-subject DEK |
-| Metadata | Server LLM generates `summary` (≤ 200 chars) + `keywords` (≤ 8 items) at write time. `MemorySearch` returns meta only; call `MemoryGet(id)` to read `value` |
-| Uniqueness | None. Multiple records on the same subject can co-exist; dedup is the caller's job |
+| Metadata | Server LLM generates `summary` (≤ 200 chars) + `keywords` (≤ 8 items) at write/update time. `MemorySearch` returns meta only; call `MemoryGet(id)` to read `value` |
+| Editing | `MemoryUpdate(id, value)` replaces an existing record's content **in place**, keeping the same `id` and re-deriving summary/keywords. This is the correct way to apply a correction — not write-new-then-delete |
 
 Skill responsibility:
 
 1. Format `value` so MetaGen produces useful summary + keywords.
-2. Run the Search → Get → merge → Write → Delete protocol whenever you need
-   to "update" a record (no upsert exists).
+2. When an existing record's fields change, edit it **in place** with the
+   Search → Get → merge → `MemoryUpdate(id)` protocol — do **not** write a new
+   record and delete the old one (see [Update protocol](#update-protocol)).
 3. Keep all sgprop writes under `scope=user` unless the user is in a group
    chat and explicitly asks to share — see [Scope](#scope) below.
 
@@ -258,32 +259,44 @@ text: viewed 2026-05-10; agent quoted 2.32m floor
 ```
 ```
 
-## Update protocol (no upsert)
+## Update protocol
 
-The platform memory tool has **no key, no uniqueness, no upsert**. To
-"update" a record:
+**When a field on an existing record changes, edit that record in place with
+`MemoryUpdate(id, value)`.** This is the right tool whenever the new value
+*replaces* an old one on a record you can locate by `id`: a corrected budget,
+an advanced `stage`, a renamed client, a revised `status`. `MemoryUpdate`
+keeps the same `id`, re-derives the summary/keywords, and leaves no stale
+duplicate behind.
+
+To edit a record:
 
 1. `MemorySearch("sgprop:<kind> <identifier>")` to locate the existing
    memory's `id`.
 2. `MemoryGet(id)` to read the current canonical JSON.
-3. Merge the new fields into the JSON in your head / scratchpad.
-4. `MemoryWrite(<new envelope>)` — this creates the new record.
-5. `MemoryDelete(<old id>)` — remove the stale copy. Only after the new
-   write returns successfully.
+3. Merge the new fields into the JSON in your head / scratchpad to build the
+   complete new envelope (`MemoryUpdate` replaces the whole `value`, so it
+   must carry every field, not just the changed one).
+4. `MemoryUpdate(id, <new envelope>)` — overwrites the record in place.
 
-Skip step 5 only when the user explicitly wants the old value preserved
-(e.g. "add a new entry, keep the old one for history" — see
-[Conflicts](#conflict-handling)).
+Do **not** `MemoryWrite` a second record and then `MemoryDelete` the old one
+to simulate an edit — that briefly leaves two conflicting copies and is the
+exact pattern `MemoryUpdate` exists to replace. Only write-then-delete when
+the user explicitly wants the old value preserved as a separate history entry
+(see [Conflicts](#conflict-handling)).
 
-### Appending events vs editing fields
+### When NOT to use MemoryUpdate
 
-- **Append** (the user did something new — a viewing, an offer, a note):
-  write a brand-new `sgprop:viewing` / `sgprop:offer` / `sgprop:note`
-  record. Do **not** mutate the parent `holding` / `candidate`. Recall via
-  `MemorySearch("sgprop:viewing <address>")`.
-- **Edit** (a stored field changed — `my_max_price_sgd` revised, `stage`
-  advanced, profile field corrected): use the full Search → Get → merge →
-  Write → Delete sequence above.
+- **A brand-new entity** (a client you have not stored yet, a first profile):
+  there is no `id` to update → `MemoryWrite`.
+- **Appending an event** (the user did something new — a viewing, an offer, a
+  note): write a brand-new `sgprop:viewing` / `sgprop:offer` / `sgprop:note`
+  record; do **not** mutate the parent `holding` / `candidate` and do **not**
+  `MemoryUpdate` the parent. Recall via `MemorySearch("sgprop:viewing
+  <address>")`.
+- **Removing** a record: `MemoryDelete(id)`.
+
+So: a stored field *changed* → `MemoryUpdate`. Something *new happened* →
+`MemoryWrite` a new record. A record is *gone* → `MemoryDelete`.
 
 ### Cascading delete
 
@@ -346,8 +359,8 @@ Long-lived facts (profile, client header, holding header) omit
 | "我是谁的画像" / first-time entry | `MemorySearch("sgprop:profile")` → `MemoryGet(id)` (or write a new one if empty) |
 | "我新看了一套" | `MemoryWrite("sgprop:candidate \| <project> \| <month>", ...)` |
 | "我去看过 Stirling 了" | `MemoryWrite("sgprop:viewing \| Stirling Residences \| <date>", ...)` |
-| "我的预算上调到 2.7m" | Search profile → Get → merge `budget_max_sgd` → Write → Delete old |
-| "把 Tan 的状态改成 offer" | Search `sgprop:client tan-2026-05-08` → Get → merge `status` → Write → Delete old |
+| "我的预算上调到 2.7m" | Search profile → Get → merge `budget_max_sgd` → `MemoryUpdate(id)` |
+| "把 Tan 的状态改成 offer" | Search `sgprop:client tan-2026-05-08` → Get → merge `status` → `MemoryUpdate(id)` |
 | "列一下我手上的客户" | `MemorySearch("sgprop:client")` |
 | "删掉 Tan 这个客户" | Search `tan-2026-05-08` → delete all hits |
 | "记一笔:这套西晒" | `MemoryWrite("sgprop:note \| candidate \| <project>", ...)` |

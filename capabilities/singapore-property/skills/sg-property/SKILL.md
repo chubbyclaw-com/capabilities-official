@@ -18,7 +18,7 @@ router; role-specific SOPs live under `references/`.
 3. **Read other references on demand:**
    - `references/memory-conventions.md` — whenever you read or write any
      persistent state via `MemoryWrite / MemoryGet / MemorySearch /
-MemoryList / MemoryDelete`
+MemoryList / MemoryUpdate / MemoryDelete`
    - `references/calc-rules.md` — when calling any `calc_*.py`
 4. **Follow the public SOP below** in every interaction regardless of role.
 
@@ -42,7 +42,7 @@ references freely as the conversation evolves.
   you need to call one in a session, confirm `python3 --version` is ≥ 3.10
   and the script is reachable; surface a clear error to the user if not.
 - Memory is platform-native (`MemoryWrite / MemoryGet / MemorySearch /
-MemoryList / MemoryDelete`) — no environment check needed.
+MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
 
 ### 2. Look before you ask
 
@@ -64,11 +64,10 @@ MemoryList / MemoryDelete`) — no environment check needed.
   district, HDB/private ownership), use `AskUserQuestion` tool with
   multiple-choice options — do **not** ask these as free-form text.
 - After the user answers, persist immediately by **updating** the profile
-  memory: `MemorySearch("sgprop:profile")` → `MemoryGet(id)` → merge the
-  new fields → `MemoryWrite(<new envelope>)` → `MemoryDelete(<old id>)`.
-  If no profile exists yet, skip Search/Get/Delete and just `MemoryWrite`.
-  See `references/memory-conventions.md` for the envelope shape and the
-  full update protocol.
+  memory in place: `MemorySearch("sgprop:profile")` → `MemoryGet(id)` →
+  merge the new fields → `MemoryUpdate(id, <new envelope>)`. If no profile
+  exists yet, just `MemoryWrite`. See `references/memory-conventions.md` for
+  the envelope shape and the full update protocol.
 - Every field is optional. If the user prefers not to share, give a
   conservative estimate explicitly labelled "未知 — 按 X 假设" and do **not**
   write that value into memory.
@@ -100,8 +99,9 @@ MemoryList / MemoryDelete`) — no environment check needed.
   location, tenure, segment, timeline — treat it exactly like the initial
   capture: **before or alongside** re-searching, write the new value back
   to that client's `sgprop:client-candidate` (or `profile.preferences`)
-  via the memory update protocol (Search → Get → merge → Write → Delete).
-  Otherwise the next recall returns the stale requirement.
+  in place via the memory update protocol (Search → Get → merge →
+  `MemoryUpdate(id)`). Otherwise the next recall returns the stale
+  requirement.
 - **An artifact / group file is NOT a substitute for updating memory
   (HARD).** A comparison table, shortlist doc, or CMA you save as a group
   file (`create_artifact`) is a _deliverable snapshot_; the
@@ -128,10 +128,11 @@ MemoryList / MemoryDelete`) — no environment check needed.
 - Sensitive fields (income, CPF balance, NRIC / nationality) write to
   `scope=user` only. Confirm with the user before persisting if the
   conversation context is a group chat.
-- There is no upsert. Use the Search → Get → merge → Write → Delete
-  protocol for edits, and write independent event records (`sgprop:viewing`,
-  `sgprop:offer`, `sgprop:note`) for new occurrences. See
-  `references/memory-conventions.md`.
+- To edit a stored record, use `MemoryUpdate(id, value)` in place via the
+  Search → Get → merge → `MemoryUpdate(id)` protocol — do **not** write a new
+  record and delete the old. Write independent event records
+  (`sgprop:viewing`, `sgprop:offer`, `sgprop:note`) for new occurrences, and
+  `MemoryDelete(id)` to remove. See `references/memory-conventions.md`.
 
 ### 5. Policy math rules (HARD)
 

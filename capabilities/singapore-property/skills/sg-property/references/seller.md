@@ -99,7 +99,7 @@ that funds the next purchase.
 Persist the chosen `listing_price_sgd` (and the rest of the `sales`
 substructure) with the update protocol: `MemorySearch("sgprop:holding
 <address>")` → `MemoryGet(id)` → merge `sales.listing_price_sgd` →
-`MemoryWrite` new envelope → `MemoryDelete(old id)`.
+`MemoryUpdate(id, <new envelope>)` (in place, same `id`).
 
 ## 5. Timing decision
 
@@ -141,7 +141,7 @@ Set the listing live by updating the holding's `sales.status` and
 
 `MemorySearch("sgprop:holding Marine Blue #18-05")` → `MemoryGet(id)` →
 merge `sales.listed_date = "2026-05-09"`, `sales.status = "live"` →
-`MemoryWrite(new envelope)` → `MemoryDelete(old id)`.
+`MemoryUpdate(id, <new envelope>)` (in place, same `id`).
 
 Then, for each viewing / offer:
 

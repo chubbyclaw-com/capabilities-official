@@ -51,8 +51,9 @@ change back to memory **before or alongside** the re-search:
 
 - `MemorySearch("sgprop:client <client_id>")` → `MemoryGet(id)` → merge the
   revised field into the `sgprop:client-candidate` (or
-  `profile.preferences`) JSON → `MemoryWrite` new envelope →
-  `MemoryDelete(old id)`. See §2 and `memory-conventions.md`.
+  `profile.preferences`) JSON → `MemoryUpdate(id, <new envelope>)` to
+  overwrite the record in place (same `id`, no stale duplicate). Do **not**
+  write a new record and delete the old. See §2 and `memory-conventions.md`.
 - Do this for **every** revision, not just when the user says "remember".
   A requirement the user spoke but you never persisted is lost on the next
   recall — the same failure mode §1's Trigger guards against, applied to
@@ -125,8 +126,8 @@ stage: shortlist
 Profile fields (income / nationality / preferences) live inside the
 `profile` substructure of the `sgprop:client` record. Update them via the
 client update protocol: `MemorySearch("sgprop:client tan-2026-05-08")` →
-`MemoryGet(id)` → merge `profile.<field>` into JSON → `MemoryWrite`
-new envelope → `MemoryDelete(old id)`.
+`MemoryGet(id)` → merge `profile.<field>` into JSON →
+`MemoryUpdate(id, <new envelope>)` (in place, same `id`).
 
 To list everything for a client:
 
@@ -237,7 +238,7 @@ Status progression for a client:
 `qualifying → dropped` (cold-cancelled)
 
 Update `status` with the client update protocol: Search → Get → merge
-`status` → Write → Delete old.
+`status` → `MemoryUpdate(id)` (in place).
 
 A weekly funnel report:
 

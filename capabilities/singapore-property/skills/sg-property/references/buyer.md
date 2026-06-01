@@ -16,11 +16,11 @@ ordered, but skip ahead when the user already has the answer.
    - `finance.monthly_income_sgd`, `finance.monthly_debt_sgd`,
      `finance.cpf_oa_sgd`, `finance.cash_available_sgd`
 3. Persist each answer immediately using the profile update protocol:
-   `MemorySearch("sgprop:profile")` → `MemoryGet(id)` → merge → `MemoryWrite`
-   the new envelope → `MemoryDelete(old id)`. If no profile exists yet,
-   skip the Search/Get/Delete and just `MemoryWrite` a fresh
-   `sgprop:profile` envelope (see `references/memory-conventions.md` for the
-   shape and the full Search→Get→merge→Write→Delete protocol).
+   `MemorySearch("sgprop:profile")` → `MemoryGet(id)` → merge →
+   `MemoryUpdate(id, <new envelope>)` to overwrite in place. If no profile
+   exists yet, just `MemoryWrite` a fresh `sgprop:profile` envelope (see
+   `references/memory-conventions.md` for the shape and the full
+   Search→Get→merge→`MemoryUpdate` protocol).
 4. Compute caps:
    - `echo '{...}' | python3 scripts/calc_tdsr.py` → max loan
    - For HDB / EC also run `calc_msr.py`
@@ -42,7 +42,7 @@ Ask the questions that narrow the search space:
 - must-haves and nice-to-haves?
 
 Persist by running the profile update protocol again (Search → Get →
-merge new `preferences` block → Write → Delete old). Tag unstable wishes
+merge new `preferences` block → `MemoryUpdate(id)`). Tag unstable wishes
 (e.g. "near a park I like") into the profile's `notes` field, or write a
 free-standing `sgprop:note` if it's verbose.
 
@@ -143,8 +143,8 @@ Stage progresses along `shortlist → viewing_scheduled → viewed → offered
 → {declined | closed}`.
 
 When the user views, makes an offer, or closes, advance the `stage` field
-via the update protocol (Search → Get → merge `stage` → Write → Delete
-old). Then, for the event itself, write an independent record:
+via the update protocol (Search → Get → merge `stage` → `MemoryUpdate(id)`).
+Then, for the event itself, write an independent record:
 
 - Viewing → `sgprop:viewing` (template in `references/memory-conventions.md`)
 - Offer → `sgprop:offer`

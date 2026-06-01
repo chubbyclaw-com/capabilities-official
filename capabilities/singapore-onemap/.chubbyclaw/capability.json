@@ -1,6 +1,7 @@
 {
   "name": "singapore-onemap",
   "description": "Search Singapore addresses, plan routes, and find nearby facilities using Singapore's official OneMap service. Use for any Singapore location lookup, routing, or nearby facility discovery.",
+  "version": "1.1.0",
   "author": {
     "name": "ChubbyClaw",
     "email": "support@chubbyclaw.com"

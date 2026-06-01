@@ -8,11 +8,11 @@ This document is the authoritative reference for the ChubbyClaw capability marke
 
 ChubbyClaw detects three types of repositories, in priority order:
 
-| Priority | Type | Detection | Description |
-|----------|------|-----------|-------------|
-| 1 | **Marketplace** | `.chubbyclaw/marketplace.json` exists | A collection of multiple capabilities |
-| 2 | **Capability** | `.chubbyclaw/capability.json` exists | A single standalone capability |
-| 3 | **Skills Collection** | Any `skills/*/SKILL.md` found | Bare skills, no manifest required |
+| Priority | Type                  | Detection                             | Description                           |
+| -------- | --------------------- | ------------------------------------- | ------------------------------------- |
+| 1        | **Marketplace**       | `.chubbyclaw/marketplace.json` exists | A collection of multiple capabilities |
+| 2        | **Capability**        | `.chubbyclaw/capability.json` exists  | A single standalone capability        |
+| 3        | **Skills Collection** | Any `skills/*/SKILL.md` found         | Bare skills, no manifest required     |
 
 ### Compatibility
 
@@ -44,19 +44,19 @@ Location: `.chubbyclaw/marketplace.json` at the repository root.
 
 ### Top-Level Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Unique identifier for this marketplace |
-| `description` | string | Yes | Human-readable summary |
-| `owner` | object | Yes | See below |
-| `capabilities` | array | Yes | List of capability entries (see below) |
+| Field          | Type   | Required | Description                            |
+| -------------- | ------ | -------- | -------------------------------------- |
+| `name`         | string | Yes      | Unique identifier for this marketplace |
+| `description`  | string | Yes      | Human-readable summary                 |
+| `owner`        | object | Yes      | See below                              |
+| `capabilities` | array  | Yes      | List of capability entries (see below) |
 
 **`owner` fields:**
 
-| Field | Type | Required |
-|-------|------|----------|
-| `name` | string | Yes |
-| `email` | string | No |
+| Field   | Type   | Required |
+| ------- | ------ | -------- |
+| `name`  | string | Yes      |
+| `email` | string | No       |
 
 ---
 
@@ -64,27 +64,30 @@ Location: `.chubbyclaw/marketplace.json` at the repository root.
 
 Each item in the `capabilities` array:
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Unique identifier (kebab-case) |
-| `description` | string | Yes | One-line summary shown in UI |
-| `source` | string or object | Yes | Where to fetch this capability (see Source Types) |
-| `category` | string | No | One of the categories below |
-| `version` | string | No | Semver, e.g. `"1.2.0"` |
-| `author` | object | No | `{ "name": "...", "email": "..." }` |
-| `homepage` | string | No | Documentation or project URL |
-| `tags` | array of strings | No | e.g. `["community-managed"]` |
-| `keywords` | array of strings | No | Search terms |
+| Field         | Type             | Required | Description                                       |
+| ------------- | ---------------- | -------- | ------------------------------------------------- |
+| `name`        | string           | Yes      | Unique identifier (kebab-case)                    |
+| `description` | string           | Yes      | One-line summary shown in UI                      |
+| `source`      | string or object | Yes      | Where to fetch this capability (see Source Types) |
+| `category`    | string           | No       | One of the categories below                       |
+| `version`     | string           | No       | Semver, e.g. `"1.2.0"`                            |
+| `author`      | object           | No       | `{ "name": "...", "email": "..." }`               |
+| `homepage`    | string           | No       | Documentation or project URL                      |
+| `tags`        | array of strings | No       | e.g. `["community-managed"]`                      |
+| `keywords`    | array of strings | No       | Search terms                                      |
 
 #### Source Types
 
 **Same-repository capability** (string shorthand):
+
 ```json
 "source": "./capabilities/my-capability"
 ```
+
 A relative path to the capability directory within the same repository.
 
 **External GitHub repository** (full repo as one capability):
+
 ```json
 "source": {
   "type": "github",
@@ -93,6 +96,7 @@ A relative path to the capability directory within the same repository.
 ```
 
 **External Git URL** (full repo):
+
 ```json
 "source": {
   "type": "url",
@@ -100,9 +104,11 @@ A relative path to the capability directory within the same repository.
   "sha": "abc123def456"
 }
 ```
+
 `sha` pins the installed version; omit to always track the default branch.
 
 **Subdirectory of an external repository**:
+
 ```json
 "source": {
   "type": "git-subdir",
@@ -129,6 +135,7 @@ The manifest is intentionally minimal. Capability contents (skills, MCP servers)
 {
   "name": "my-capability",
   "description": "What this capability does and when to use it.",
+  "version": "1.1.0",
   "author": {
     "name": "Author Name",
     "email": "author@example.com"
@@ -138,12 +145,13 @@ The manifest is intentionally minimal. Capability contents (skills, MCP servers)
 
 ### Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Unique identifier (kebab-case) |
-| `description` | string | Yes | Summary shown in UI and injected into agent system prompt |
-| `author` | object | No | `{ "name": "...", "email": "...", "url": "..." }` |
-| `credentials` | array | No | Credentials this capability needs (see [`credentials`](#credentials)) |
+| Field         | Type   | Required | Description                                                                                       |
+| ------------- | ------ | -------- | ------------------------------------------------------------------------------------------------- |
+| `name`        | string | Yes      | Unique identifier (kebab-case)                                                                    |
+| `description` | string | Yes      | Summary shown in UI and injected into agent system prompt                                         |
+| `version`     | string | No       | Semver, e.g. `"1.1.0"`. Authoritative capability version shown in UI; omitted defaults to `1.0.0` |
+| `author`      | object | No       | `{ "name": "...", "email": "...", "url": "..." }`                                                 |
+| `credentials` | array  | No       | Credentials this capability needs (see [`credentials`](#credentials))                             |
 
 ### `credentials`
 
@@ -171,16 +179,16 @@ Declares what API keys or OAuth connections this capability requires. Capabiliti
 
 Each entry in the `credentials` array:
 
-| Field | Type | Applies to | Required | Description |
-|-------|------|------------|----------|-------------|
-| `name` | string | both | Yes | For `api_key`: the environment variable name (e.g. `TAVILY_API_KEY`). For `oauth`: a connection identifier (e.g. `GOOGLE_DRIVE`). |
-| `type` | string | both | Yes | `"api_key"` or `"oauth"` |
-| `provider` | string | `oauth` only | Yes (oauth) | `"google"`, `"github"`, `"slack"`, or `"custom"` |
-| `scopes` | array of strings | `oauth` only | No | OAuth scopes to request (e.g. `["drive.readonly"]`) |
-| `required` | boolean | both | No | Whether the credential is required to run. Defaults to `true`. |
-| `description` | string | both | No | User-facing label shown in the credential picker |
-| `help_url` | string | `api_key` only | No | Link to where the user can obtain the key |
-| `oauth_config` | object | `oauth` only | No | Custom OAuth endpoints — only when `provider` is `"custom"` |
+| Field          | Type             | Applies to     | Required    | Description                                                                                                                       |
+| -------------- | ---------------- | -------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `name`         | string           | both           | Yes         | For `api_key`: the environment variable name (e.g. `TAVILY_API_KEY`). For `oauth`: a connection identifier (e.g. `GOOGLE_DRIVE`). |
+| `type`         | string           | both           | Yes         | `"api_key"` or `"oauth"`                                                                                                          |
+| `provider`     | string           | `oauth` only   | Yes (oauth) | `"google"`, `"github"`, `"slack"`, or `"custom"`                                                                                  |
+| `scopes`       | array of strings | `oauth` only   | No          | OAuth scopes to request (e.g. `["drive.readonly"]`)                                                                               |
+| `required`     | boolean          | both           | No          | Whether the credential is required to run. Defaults to `true`.                                                                    |
+| `description`  | string           | both           | No          | User-facing label shown in the credential picker                                                                                  |
+| `help_url`     | string           | `api_key` only | No          | Link to where the user can obtain the key                                                                                         |
+| `oauth_config` | object           | `oauth` only   | No          | Custom OAuth endpoints — only when `provider` is `"custom"`                                                                       |
 
 #### Custom OAuth Provider (`oauth_config`)
 
@@ -234,10 +242,10 @@ description: "What this skill does and WHEN the agent should invoke it."
 Full skill instructions here...
 ```
 
-| Frontmatter Field | Required | Description |
-|-------------------|----------|-------------|
-| `name` | Yes | Must match the parent directory name |
-| `description` | Yes | Shown in agent system prompt for skill discovery |
+| Frontmatter Field | Required | Description                                      |
+| ----------------- | -------- | ------------------------------------------------ |
+| `name`            | Yes      | Must match the parent directory name             |
+| `description`     | Yes      | Shown in agent system prompt for skill discovery |
 
 ### `.mcp.json`
 
@@ -300,12 +308,12 @@ A repository that is itself one capability:
 
 ## Compatibility Matrix
 
-| Repo Format | Detected As | Notes |
-|-------------|-------------|-------|
-| `.chubbyclaw/marketplace.json` | Marketplace | Native ChubbyClaw format |
-| `.chubbyclaw/capability.json` | Capability | Native ChubbyClaw format |
-| `.claude-plugin/marketplace.json` | Marketplace | Claude Code compatible |
-| `.claude-plugin/plugin.json` | Capability | Claude Code compatible |
-| `.cursor-plugin/marketplace.json` | Marketplace | Cursor compatible |
-| `.cursor-plugin/plugin.json` | Capability | Cursor compatible |
-| `skills/*/SKILL.md` present | Skills Collection | No manifest required |
+| Repo Format                       | Detected As       | Notes                    |
+| --------------------------------- | ----------------- | ------------------------ |
+| `.chubbyclaw/marketplace.json`    | Marketplace       | Native ChubbyClaw format |
+| `.chubbyclaw/capability.json`     | Capability        | Native ChubbyClaw format |
+| `.claude-plugin/marketplace.json` | Marketplace       | Claude Code compatible   |
+| `.claude-plugin/plugin.json`      | Capability        | Claude Code compatible   |
+| `.cursor-plugin/marketplace.json` | Marketplace       | Cursor compatible        |
+| `.cursor-plugin/plugin.json`      | Capability        | Cursor compatible        |
+| `skills/*/SKILL.md` present       | Skills Collection | No manifest required     |

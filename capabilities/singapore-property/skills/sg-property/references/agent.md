@@ -20,7 +20,7 @@ exists (match by name / area / requirement); update rather than duplicate.
 
 For a new client, write a `sgprop:client` record:
 
-```
+````
 MemoryWrite(value="""sgprop:client | tan-2026-05-08 | Mr Tan
 
 role: buyer
@@ -29,8 +29,10 @@ status: qualifying
 ```json
 {"client_id":"tan-2026-05-08","name":"Mr Tan","role":"buyer",
  "status":"qualifying"}
-```
+````
+
 """)
+
 ```
 
 `client_id` should be slug-safe (lowercase letters, digits, hyphens). A
@@ -38,6 +40,32 @@ typical pattern is `<surname>-<YYYY-MM-DD>`. Always echo `client_id` and
 name in the header so MetaGen captures them as keywords.
 
 `role` is one of: `buyer`, `seller`, `both`.
+
+## 1a. Keep the client record current (HARD)
+
+Onboarding is not one-and-done. Whenever the client's stated requirement
+**changes** during the conversation — a new budget ("max 2.5 now, cannot
+go higher"), different bedrooms, added/dropped constraint (school, MRT,
+tenure: "freehold drop, 99yr also can"), or a shifted timeline — write the
+change back to memory **before or alongside** the re-search:
+
+- `MemorySearch("sgprop:client <client_id>")` → `MemoryGet(id)` → merge the
+  revised field into the `sgprop:client-candidate` (or
+  `profile.preferences`) JSON → `MemoryWrite` new envelope →
+  `MemoryDelete(old id)`. See §2 and `memory-conventions.md`.
+- Do this for **every** revision, not just when the user says "remember".
+  A requirement the user spoke but you never persisted is lost on the next
+  recall — the same failure mode §1's Trigger guards against, applied to
+  updates.
+
+**Client record (memory) vs. deliverable (artifact) — don't confuse them.**
+The `sgprop:client*` memory records are the CRM source of truth that future
+`MemorySearch` reads. A shortlist / comparison table / CMA saved with
+`create_artifact` is a *handout snapshot*. When the agent says "save into
+Mr Tan's file / 存进 X 的档案", that means **update the client memory
+record**; producing a group-file artifact is an optional extra, never a
+replacement. If you create an artifact, still update the client memory so
+the next recall reflects the latest requirement.
 
 ## 2. Per-client profile + holdings + candidates
 
@@ -51,7 +79,9 @@ Always echo the `client_id` in the header so future searches by client
 work.
 
 ```
+
 # Client's existing holding (for upgrade work)
+
 MemoryWrite(value="""sgprop:client-holding | tan-2026-05-08 | Block 123 Tampines St 11 #08-12
 
 type: hdb
@@ -59,25 +89,38 @@ purchase_date: 2015-04
 purchase_price_sgd: 480000
 
 ```json
-{"client_id":"tan-2026-05-08",
- "address":"Block 123 Tampines St 11 #08-12","type":"hdb",
- "purchase_date":"2015-04","purchase_price_sgd":480000}
+{
+  "client_id": "tan-2026-05-08",
+  "address": "Block 123 Tampines St 11 #08-12",
+  "type": "hdb",
+  "purchase_date": "2015-04",
+  "purchase_price_sgd": 480000
+}
 ```
+
 """)
+
 ```
 
 ```
+
 # Client's candidate
+
 MemoryWrite(value="""sgprop:client-candidate | tan-2026-05-08 | Bedok South Residences
 
 stage: shortlist
 
 ```json
-{"client_id":"tan-2026-05-08","project_name":"Bedok South Residences",
- "stage":"shortlist"}
+{
+  "client_id": "tan-2026-05-08",
+  "project_name": "Bedok South Residences",
+  "stage": "shortlist"
+}
 ```
+
 """)
-```
+
+````
 
 Profile fields (income / nationality / preferences) live inside the
 `profile` substructure of the `sgprop:client` record. Update them via the
@@ -164,7 +207,7 @@ Agent: <agent name>
 | Lawyer | $2,800 |
 | Loan settlement | $720,000 |
 | Net to seller (at market) | $1,119,600 |
-```
+````
 
 Pull data via `sgprop_project_report` + `sgprop_transactions`. Compute
 SSD with `calc_ssd.py`. Sale-cost numbers come from the seller workflow.
@@ -230,6 +273,7 @@ sgprop_search_projects --segment private --tenure freehold \
 ```
 
 Then per candidate:
+
 ```
 sgprop_project_report --project "..." --sections meta,tenure
 sgprop_location_context --address "..." (master_plan section)

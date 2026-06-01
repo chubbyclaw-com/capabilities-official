@@ -18,17 +18,17 @@ router; role-specific SOPs live under `references/`.
 3. **Read other references on demand:**
    - `references/memory-conventions.md` — whenever you read or write any
      persistent state via `MemoryWrite / MemoryGet / MemorySearch /
-     MemoryList / MemoryDelete`
+MemoryList / MemoryDelete`
    - `references/calc-rules.md` — when calling any `calc_*.py`
 4. **Follow the public SOP below** in every interaction regardless of role.
 
 ## Routing
 
-| Keyword / phrase | Role | Action |
-|------------------|------|--------|
-| 买 / 看房 / new launch / 投资公寓 / 自住 / 外籍人士能买 / 我能买二套 / 预算 / 找个 X BR | buyer | Read `references/buyer.md` |
-| 卖 / 挂牌 / 我家这套 / CMA / SSD / 换房 / 现在卖还是再持 | seller | Read `references/seller.md` |
-| 客户 / 带看 / 客户漏斗 / 帮 X 先生看 / 中介 / 开单 / client / my client / got a client / for a client / 帮客户找 | agent | Read `references/agent.md` |
+| Keyword / phrase                                                                                                 | Role   | Action                      |
+| ---------------------------------------------------------------------------------------------------------------- | ------ | --------------------------- |
+| 买 / 看房 / new launch / 投资公寓 / 自住 / 外籍人士能买 / 我能买二套 / 预算 / 找个 X BR                          | buyer  | Read `references/buyer.md`  |
+| 卖 / 挂牌 / 我家这套 / CMA / SSD / 换房 / 现在卖还是再持                                                         | seller | Read `references/seller.md` |
+| 客户 / 带看 / 客户漏斗 / 帮 X 先生看 / 中介 / 开单 / client / my client / got a client / for a client / 帮客户找 | agent  | Read `references/agent.md`  |
 
 If the user mixes roles (e.g. "I want to sell my current place to upgrade"),
 ask which side they want to start with, then load that reference. Switch
@@ -42,7 +42,7 @@ references freely as the conversation evolves.
   you need to call one in a session, confirm `python3 --version` is ≥ 3.10
   and the script is reachable; surface a clear error to the user if not.
 - Memory is platform-native (`MemoryWrite / MemoryGet / MemorySearch /
-  MemoryList / MemoryDelete`) — no environment check needed.
+MemoryList / MemoryDelete`) — no environment check needed.
 
 ### 2. Look before you ask
 
@@ -95,6 +95,22 @@ references freely as the conversation evolves.
 - This only applies to the agent role. For buyer/seller (the user's own
   search), keep following §3 — persist the user's own `sgprop:profile`,
   not a client record.
+- **Requirement changes are captures too (HARD).** When a known client
+  revises a stated requirement mid-conversation — budget, bedrooms,
+  location, tenure, segment, timeline — treat it exactly like the initial
+  capture: **before or alongside** re-searching, write the new value back
+  to that client's `sgprop:client-candidate` (or `profile.preferences`)
+  via the memory update protocol (Search → Get → merge → Write → Delete).
+  Otherwise the next recall returns the stale requirement.
+- **An artifact / group file is NOT a substitute for updating memory
+  (HARD).** A comparison table, shortlist doc, or CMA you save as a group
+  file (`create_artifact`) is a _deliverable snapshot_; the
+  `sgprop:client*` memory record is the CRM source of truth that later
+  `MemorySearch` reads. They are different stores. When the user says
+  "save this to <client>'s file / 存进 X 的档案", **update the client
+  memory record first**, then optionally also create the artifact if they
+  want a shareable document — never do only the artifact and leave the
+  client's memory stale.
 
 ### 4. Memory access rules (HARD)
 
@@ -140,7 +156,7 @@ references freely as the conversation evolves.
 - If the user gives a new value that contradicts something already in
   memory, follow the conflict protocol in `references/memory-conventions.md`:
   Search → Get, restate the diff to the user, ask "覆盖 / 追加新条 / 保留
-  旧值",  then apply the answer. Never overwrite silently.
+  旧值", then apply the answer. Never overwrite silently.
 
 ### 8. Currency, units, dates
 

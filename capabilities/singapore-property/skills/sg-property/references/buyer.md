@@ -71,10 +71,10 @@ asking_price_sgd: 2350000
 {"project_name":"Stirling Residences","address":"Stirling Rd",
  "stage":"shortlist","asking_price_sgd":2350000}
 ```
-""")
+""", tags=["sgprop:candidate", "Stirling Residences"])
 ```
 
-(Full envelope shape and identifier rules in
+(Full envelope shape, `tags`, and identifier rules in
 `references/memory-conventions.md`.)
 
 ## 4. Candidate deep dive
@@ -93,8 +93,9 @@ Update the candidate with what you learn using the update protocol:
 1. `MemorySearch("sgprop:candidate Stirling Residences")` → grab the id
 2. `MemoryGet(id)` → parse the JSON body
 3. Merge `estimated_value_sgd`, `pros`, `cons` into the JSON
-4. `MemoryWrite(<new envelope>)`
-5. `MemoryDelete(<old id>)`
+4. `MemoryUpdate(id, <new envelope>)` — in place, same `id`; omit `tags`
+   (the identifier hasn't changed). Do **not** write a new record and delete
+   the old one.
 
 ## 5. Valuation & negotiation
 
@@ -160,7 +161,7 @@ text: viewed 2026-05-10; agent quoted $2.32m floor
 {"parent_kind":"candidate","parent_id":"Stirling Residences",
  "text":"viewed 2026-05-10; agent quoted $2.32m floor","date":"2026-05-10"}
 ```
-""")
+""", tags=["sgprop:note", "Stirling Residences"])
 ```
 
 ## Common pitfalls to flag to the user

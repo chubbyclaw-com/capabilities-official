@@ -10,15 +10,17 @@ Platform contract (excerpt of `chubbyclaw/docs/design/14-memory-system.md`):
 
 | Item | Value |
 |------|-------|
-| Tools | `MemoryWrite(value, scope?, expires_in_days?)`, `MemoryGet(id)`, `MemorySearch(query, limit?)`, `MemoryList(limit?)`, `MemoryUpdate(id, value)`, `MemoryDelete(id)` |
+| Tools | `MemoryWrite(value, tags?, scope?, expires_in_days?)`, `MemoryGet(id)`, `MemorySearch(query, limit?)`, `MemoryList(limit?)`, `MemoryUpdate(id, value, tags?)`, `MemoryDelete(id)` |
 | `scope` | `user` (default) or `chatgroup` — server-injected `subject_type / subject_id / actor` cannot be set by the model |
 | `value` | Plaintext ≤ 8 KB; encrypted at rest with a per-subject DEK |
-| Metadata | Server LLM generates `summary` (≤ 200 chars) + `keywords` (≤ 8 items) at write/update time. `MemorySearch` returns meta only; call `MemoryGet(id)` to read `value` |
-| Editing | `MemoryUpdate(id, value)` replaces an existing record's content **in place**, keeping the same `id` and re-deriving summary/keywords. This is the correct way to apply a correction — not write-new-then-delete |
+| Metadata | Server LLM (MetaGen) generates `summary` (≤ 200 chars) + natural-language `keywords` (≤ 8 items) at write/update time. `MemorySearch` returns meta only; call `MemoryGet(id)` to read `value` |
+| `tags` | Optional `string[]` the **caller** passes to `MemoryWrite` / `MemoryUpdate`: explicit, stable retrieval atoms stored **verbatim**. They sit alongside the LLM `keywords` and both participate in `MemorySearch` substring matching, but `tags` are **never** rewritten or dropped by MetaGen — this is what makes the `sgprop:<kind>` atoms reliably findable. On `MemoryUpdate`: **omit** `tags` = keep the record's existing tags (the norm when you only change `value`); **pass** `tags` = full overwrite (pass `[]` to clear) |
+| Editing | `MemoryUpdate(id, value)` replaces an existing record's content **in place**, keeping the same `id` and re-deriving summary/keywords (existing `tags` are preserved unless you pass new ones). This is the correct way to apply a correction — not write-new-then-delete |
 
 Skill responsibility:
 
-1. Format `value` so MetaGen produces useful summary + keywords.
+1. Format `value` so MetaGen produces a useful summary, and pass the
+   record's stable retrieval atoms via `tags` (see [Record envelope](#record-envelope)).
 2. When an existing record's fields change, edit it **in place** with the
    Search → Get → merge → `MemoryUpdate(id)` protocol — do **not** write a new
    record and delete the old one (see [Update protocol](#update-protocol)).
@@ -27,8 +29,9 @@ Skill responsibility:
 
 ## Record envelope
 
-Every memory record is one logical entity. The `value` text follows this
-shape:
+Every memory record is one logical entity. Each `MemoryWrite` carries two
+things: the `value` text (below) **and** a `tags` array of the record's
+stable retrieval atoms. The `value` follows this shape:
 
 ```
 sgprop:<kind> | <stable-id-or-name>
@@ -42,30 +45,49 @@ key2: value2
 ```
 ```
 
-- The **first line** is the discoverability header. `sgprop`, `<kind>`, and
-  the identifier nearly always end up in the MetaGen `keywords`. Without
-  this line, future `MemorySearch` calls cannot find the record.
+Pass the matching `tags` on every write — `sgprop:<kind>` plus that kind's
+identifier(s):
+
+```
+MemoryWrite(value="""sgprop:candidate | Stirling Residences | 2026-05
+...
+""", tags=["sgprop:candidate", "Stirling Residences"])
+```
+
+- **Retrieval is carried by `tags`, not by MetaGen.** The atoms you pass in
+  `tags` are stored verbatim and matched by `MemorySearch` as-is, so
+  `MemorySearch("sgprop:candidate")` / `MemorySearch("sgprop:client <id>")`
+  reliably hit. (MetaGen's `keywords` are natural-language and may drop the
+  `sgprop:<kind>` header — never rely on them for atom lookup.)
+- The **first line** of `value` is still the human-readable header and the
+  anchor for JSON parsing, but it no longer carries the retrieval job; keep
+  it in sync with the `tags` (same `sgprop:<kind>` + identifiers).
 - The **plaintext key:value block** carries the most important facts so the
   MetaGen `summary` reads naturally.
 - The **fenced JSON** is the machine-readable canonical form. After
   `MemoryGet(id)`, parse this block to get every field.
 - Always echo the entity's key identifier(s) — `client_id`, full address,
-  project name — verbatim in the header. MetaGen will not invent keywords
-  that are absent from the body.
+  project name — verbatim in **both** the header and `tags`.
 
 ## Record kinds
 
-| Kind | Used by | Identifier echoed in header | Count |
-|------|---------|------------------------------|-------|
-| `sgprop:profile` | buyer / seller | (none — one per user) | 1 |
-| `sgprop:holding` | seller | full `address` | N |
-| `sgprop:candidate` | buyer | `project_name` + capture month | N |
-| `sgprop:client` | agent | `client_id` slug `<surname>-YYYY-MM-DD` | N |
-| `sgprop:client-holding` | agent | `client_id` + `address` | N |
-| `sgprop:client-candidate` | agent | `client_id` + `project_name` | N |
-| `sgprop:viewing` | seller / agent | parent `address` or `project_name` + date | N |
-| `sgprop:offer` | seller / agent | parent `address` or `project_name` + date | N |
-| `sgprop:note` | any | parent record identifier (free text) | N |
+| Kind | Used by | Identifier echoed in header | `tags` to pass | Count |
+|------|---------|------------------------------|----------------|-------|
+| `sgprop:profile` | buyer / seller | (none — one per user) | `["sgprop:profile"]` | 1 |
+| `sgprop:holding` | seller | full `address` | `["sgprop:holding", "<address>"]` | N |
+| `sgprop:candidate` | buyer | `project_name` + capture month | `["sgprop:candidate", "<project_name>"]` | N |
+| `sgprop:client` | agent | `client_id` slug `<surname>-YYYY-MM-DD` | `["sgprop:client", "<client_id>"]` | N |
+| `sgprop:client-holding` | agent | `client_id` + `address` | `["sgprop:client-holding", "<client_id>", "<address>"]` | N |
+| `sgprop:client-candidate` | agent | `client_id` + `project_name` | `["sgprop:client-candidate", "<client_id>", "<project_name>"]` | N |
+| `sgprop:viewing` | seller / agent | parent `address` or `project_name` + date | `["sgprop:viewing", "<parent identifier>"]` | N |
+| `sgprop:offer` | seller / agent | parent `address` or `project_name` + date | `["sgprop:offer", "<parent identifier>"]` | N |
+| `sgprop:note` | any | parent record identifier (free text) | `["sgprop:note", "<parent identifier>"]` | N |
+
+The `tags` column is the stable retrieval atom set: always `sgprop:<kind>`
+plus the identifier(s) future `MemorySearch` calls will query on. Pass it
+verbatim on every `MemoryWrite`. For `client` records also include the
+client name as an extra tag if you want name lookups to hit
+(`["sgprop:client", "<client_id>", "<name>"]`).
 
 Each record is independent. `client` is split from `client-holding /
 client-candidate` so that updating one client's candidate list does not
@@ -74,7 +96,12 @@ under the 8 KB cap.
 
 ### Templates
 
+Each template shows the `value`. The `tags` to pass alongside it are noted
+under each block.
+
 #### `sgprop:profile`
+
+`tags=["sgprop:profile"]`
 
 ```
 sgprop:profile
@@ -115,6 +142,8 @@ intent: upgrade
 
 #### `sgprop:holding`
 
+`tags=["sgprop:holding", "Marine Blue #18-05"]`
+
 ```
 sgprop:holding | Marine Blue #18-05
 
@@ -141,6 +170,8 @@ intent: sell
 
 #### `sgprop:candidate`
 
+`tags=["sgprop:candidate", "Stirling Residences"]`
+
 ```
 sgprop:candidate | Stirling Residences | 2026-05
 
@@ -166,6 +197,8 @@ Stage progresses: `shortlist → viewing_scheduled → viewed → offered →
 
 #### `sgprop:client`
 
+`tags=["sgprop:client", "tan-2026-05-08", "Mr Tan"]`
+
 ```
 sgprop:client | tan-2026-05-08 | Mr Tan
 
@@ -185,6 +218,8 @@ status: qualifying
 
 #### `sgprop:client-holding`
 
+`tags=["sgprop:client-holding", "tan-2026-05-08", "Block 123 Tampines St 11 #08-12"]`
+
 ```
 sgprop:client-holding | tan-2026-05-08 | Block 123 Tampines St 11 #08-12
 
@@ -201,6 +236,8 @@ purchase_price_sgd: 480000
 
 #### `sgprop:client-candidate`
 
+`tags=["sgprop:client-candidate", "tan-2026-05-08", "Bedok South Residences"]`
+
 ```
 sgprop:client-candidate | tan-2026-05-08 | Bedok South Residences
 
@@ -213,6 +250,8 @@ stage: shortlist
 ```
 
 #### `sgprop:viewing`
+
+`tags=["sgprop:viewing", "Marine Blue #18-05"]`
 
 ```
 sgprop:viewing | Marine Blue #18-05 | 2026-05-12
@@ -227,10 +266,13 @@ attendees: 2
 ```
 ```
 
-For an agent client's viewing, set `parent_kind: "client-candidate"` and
-`parent_id: "<client_id> | <project_name>"`.
+For an agent client's viewing, set `parent_kind: "client-candidate"`,
+`parent_id: "<client_id> | <project_name>"`, and pass
+`tags=["sgprop:viewing", "<client_id>", "<project_name>"]`.
 
 #### `sgprop:offer`
+
+`tags=["sgprop:offer", "Marine Blue #18-05"]`
 
 ```
 sgprop:offer | Marine Blue #18-05 | 2026-05-15
@@ -246,6 +288,8 @@ status: rejected
 ```
 
 #### `sgprop:note`
+
+`tags=["sgprop:note", "Stirling Residences"]`
 
 ```
 sgprop:note | candidate | Stirling Residences
@@ -277,6 +321,16 @@ To edit a record:
    complete new envelope (`MemoryUpdate` replaces the whole `value`, so it
    must carry every field, not just the changed one).
 4. `MemoryUpdate(id, <new envelope>)` — overwrites the record in place.
+   **Omit `tags`** so the record keeps its existing retrieval atoms; you are
+   only changing `value`, not how the record is found.
+
+**Tags on update — only when the identifier itself changes.** Pass a new
+`tags` array to `MemoryUpdate` *solely* when the atom you search on moves —
+e.g. a client renamed (`client_id` re-slugged) or a holding re-addressed.
+Then pass the full replacement set (`MemoryUpdate(id, value, tags=["sgprop:client", "<new_id>", "<new name>"]`)
+and update the `value` header to match. A field edit that does **not** touch
+the identifier (a corrected budget, an advanced `stage`, a revised `status`)
+leaves `tags` untouched — omit the parameter.
 
 Do **not** `MemoryWrite` a second record and then `MemoryDelete` the old one
 to simulate an edit — that briefly leaves two conflicting copies and is the
@@ -356,11 +410,11 @@ Long-lived facts (profile, client header, holding header) omit
 
 | User says | Call |
 |-----------|------|
-| "我是谁的画像" / first-time entry | `MemorySearch("sgprop:profile")` → `MemoryGet(id)` (or write a new one if empty) |
-| "我新看了一套" | `MemoryWrite("sgprop:candidate \| <project> \| <month>", ...)` |
-| "我去看过 Stirling 了" | `MemoryWrite("sgprop:viewing \| Stirling Residences \| <date>", ...)` |
-| "我的预算上调到 2.7m" | Search profile → Get → merge `budget_max_sgd` → `MemoryUpdate(id)` |
-| "把 Tan 的状态改成 offer" | Search `sgprop:client tan-2026-05-08` → Get → merge `status` → `MemoryUpdate(id)` |
+| "我是谁的画像" / first-time entry | `MemorySearch("sgprop:profile")` → `MemoryGet(id)` (or `MemoryWrite(..., tags=["sgprop:profile"])` if empty) |
+| "我新看了一套" | `MemoryWrite("sgprop:candidate \| <project> \| <month>", ..., tags=["sgprop:candidate", "<project>"])` |
+| "我去看过 Stirling 了" | `MemoryWrite("sgprop:viewing \| Stirling Residences \| <date>", ..., tags=["sgprop:viewing", "Stirling Residences"])` |
+| "我的预算上调到 2.7m" | Search profile → Get → merge `budget_max_sgd` → `MemoryUpdate(id)` (tags unchanged) |
+| "把 Tan 的状态改成 offer" | Search `sgprop:client tan-2026-05-08` → Get → merge `status` → `MemoryUpdate(id)` (tags unchanged) |
 | "列一下我手上的客户" | `MemorySearch("sgprop:client")` |
 | "删掉 Tan 这个客户" | Search `tan-2026-05-08` → delete all hits |
-| "记一笔:这套西晒" | `MemoryWrite("sgprop:note \| candidate \| <project>", ...)` |
+| "记一笔:这套西晒" | `MemoryWrite("sgprop:note \| candidate \| <project>", ..., tags=["sgprop:note", "<project>"])` |

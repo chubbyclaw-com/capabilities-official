@@ -34,10 +34,10 @@ intent: sell
  "purchase_price_sgd":1380000,"current_loan_sgd":720000,
  "remaining_lease_years":86,"intent":"sell"}
 ```
-""")
+""", tags=["sgprop:holding", "Marine Blue #18-05"])
 ```
 
-(Full envelope shape in `references/memory-conventions.md`.)
+(Full envelope shape and `tags` in `references/memory-conventions.md`.)
 
 ## 2. CMA valuation
 
@@ -155,7 +155,7 @@ attendees: 2
 {"parent_kind":"holding","parent_id":"Marine Blue #18-05",
  "date":"2026-05-12","outcome":"interested","attendees":2}
 ```
-""")
+""", tags=["sgprop:viewing", "Marine Blue #18-05"])
 ```
 
 ```
@@ -168,7 +168,7 @@ status: rejected
 {"parent_kind":"holding","parent_id":"Marine Blue #18-05",
  "date":"2026-05-15","amount_sgd":1830000,"status":"rejected"}
 ```
-""")
+""", tags=["sgprop:offer", "Marine Blue #18-05"])
 ```
 
 To review the listing history: `MemorySearch("sgprop:viewing Marine Blue

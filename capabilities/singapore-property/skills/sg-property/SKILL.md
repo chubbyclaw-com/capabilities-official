@@ -65,9 +65,11 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
   multiple-choice options — do **not** ask these as free-form text.
 - After the user answers, persist immediately by **updating** the profile
   memory in place: `MemorySearch("sgprop:profile")` → `MemoryGet(id)` →
-  merge the new fields → `MemoryUpdate(id, <new envelope>)`. If no profile
-  exists yet, just `MemoryWrite`. See `references/memory-conventions.md` for
-  the envelope shape and the full update protocol.
+  merge the new fields → `MemoryUpdate(id, <new envelope>)` (omit `tags` —
+  the identifier is unchanged). If no profile exists yet, just
+  `MemoryWrite(..., tags=["sgprop:profile"])`. See
+  `references/memory-conventions.md` for the envelope shape, the per-kind
+  `tags`, and the full update protocol.
 - Every field is optional. If the user prefers not to share, give a
   conservative estimate explicitly labelled "未知 — 按 X 假设" and do **not**
   write that value into memory.
@@ -117,10 +119,13 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
 - Read or write persistent state **only** through the platform
   `Memory*` tools. Do **not** invent local file storage (`~/.config/...`,
   `Write` to disk, etc.) for any sgprop data.
-- Every `MemoryWrite` `value` must lead with the
-  `sgprop:<kind> | <identifier>` header line so MetaGen produces useful
-  keywords — see `references/memory-conventions.md` for the record envelope
-  and per-kind templates.
+- Every `MemoryWrite` must (a) lead its `value` with the
+  `sgprop:<kind> | <identifier>` header line (human-readable + JSON-parse
+  anchor) **and** (b) pass `tags=["sgprop:<kind>", "<identifier>", ...]` —
+  the stable, verbatim retrieval atoms that make `MemorySearch("sgprop:...")`
+  hit. Retrieval rides on `tags`, not on MetaGen's keywords. See
+  `references/memory-conventions.md` for the per-kind `tags` table and
+  templates.
 - Default to `scope=user` (rely on the platform default; do not pass
   `scope` unless overriding). Only use `scope=chatgroup` when the user is
   in a group chat **and** explicitly asks to share, **and** has been warned
@@ -130,7 +135,9 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
   conversation context is a group chat.
 - To edit a stored record, use `MemoryUpdate(id, value)` in place via the
   Search → Get → merge → `MemoryUpdate(id)` protocol — do **not** write a new
-  record and delete the old. Write independent event records
+  record and delete the old. Omit `tags` so the existing retrieval atoms are
+  kept; pass a new `tags` array only when the identifier itself changes (a
+  renamed client, a re-addressed holding). Write independent event records
   (`sgprop:viewing`, `sgprop:offer`, `sgprop:note`) for new occurrences, and
   `MemoryDelete(id)` to remove. See `references/memory-conventions.md`.
 

@@ -31,13 +31,14 @@ status: qualifying
  "status":"qualifying"}
 ````
 
-""")
+""", tags=["sgprop:client", "tan-2026-05-08", "Mr Tan"])
 
 ```
 
 `client_id` should be slug-safe (lowercase letters, digits, hyphens). A
-typical pattern is `<surname>-<YYYY-MM-DD>`. Always echo `client_id` and
-name in the header so MetaGen captures them as keywords.
+typical pattern is `<surname>-<YYYY-MM-DD>`. Echo `client_id` and name in
+the header **and** pass them as `tags=["sgprop:client", "<client_id>", "<name>"]`
+so future `MemorySearch` by id or name hits (retrieval rides on `tags`).
 
 `role` is one of: `buyer`, `seller`, `both`.
 
@@ -76,8 +77,8 @@ the `sgprop:client` header. Use the dedicated kinds:
 - `sgprop:client-holding` — a property the client owns
 - `sgprop:client-candidate` — a property the client is evaluating
 
-Always echo the `client_id` in the header so future searches by client
-work.
+Always echo the `client_id` in the header **and** include it in `tags`
+(`["sgprop:<kind>", "<client_id>", ...]`) so future searches by client work.
 
 ```
 
@@ -99,7 +100,7 @@ purchase_price_sgd: 480000
 }
 ```
 
-""")
+""", tags=["sgprop:client-holding", "tan-2026-05-08", "Block 123 Tampines St 11 #08-12"])
 
 ```
 
@@ -119,7 +120,7 @@ stage: shortlist
 }
 ```
 
-""")
+""", tags=["sgprop:client-candidate", "tan-2026-05-08", "Bedok South Residences"])
 
 ````
 
@@ -133,8 +134,8 @@ To list everything for a client:
 
 - `MemorySearch("tan-2026-05-08")` returns the client header plus every
   `client-holding` / `client-candidate` / `viewing` / `offer` / `note`
-  that mentions the client_id (MetaGen will have indexed those records).
-  Then `MemoryGet(id)` the ones you need.
+  that carries the `client_id` in its `tags` (which is why every such write
+  must include it). Then `MemoryGet(id)` the ones you need.
 
 ## 3. Client requirement gathering
 
@@ -145,8 +146,10 @@ To list everything for a client:
     `sgprop:client` record
   - `sgprop:candidate` → `sgprop:client-candidate` (with `client_id`)
   - `sgprop:viewing` / `sgprop:offer` / `sgprop:note` → still as
-    independent records, but set `parent_kind: "client-candidate"` and
-    write `<client_id> | <project>` in the header
+    independent records, but set `parent_kind: "client-candidate"`, write
+    `<client_id> | <project>` in the header, and pass
+    `tags=["sgprop:<kind>", "<client_id>", "<project>"]` so they surface on
+    a client search
 - For seller clients, work through the seller workflow
   (`references/seller.md`) with the same swap:
   - `sgprop:holding` → `sgprop:client-holding`

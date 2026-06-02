@@ -1,7 +1,7 @@
 {
   "name": "singapore-property",
   "description": "Singapore property decision assistant — buyer / seller / agent workflows. Search projects, value units, calc taxes (ABSD/BSD/SSD/TDSR), track candidates and clients. Backed by sgprop MCP (URA + HDB + rental data).",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "author": {
     "name": "ChubbyClaw",
     "email": "support@chubbyclaw.com"

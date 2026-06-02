@@ -2,22 +2,42 @@
 
 Use this reference when the user wants to value, list, or sell their place.
 
-## 1. Capture the holding
+## 1. Capture the profile & holdings
+
+Persist the seller's situation as **canonical envelope records** before any
+analysis — never a single free-form summary memory (see SKILL.md §3b). A
+seller's situation decomposes into **one `sgprop:profile`** plus **one
+`sgprop:holding` per property they own** (an upgrader typically has ≥ 2: the
+home being sold plus any investment unit).
+
+### 1a. Profile
+
+`MemorySearch("sgprop:profile")` — if a hit comes back, `MemoryGet(id)` and
+update in place (§3 protocol). If none, `MemoryWrite` a fresh
+`sgprop:profile`, `tags=["sgprop:profile"]`, capturing identity / finance /
+ownership counts / `intent` (`sell` or `upgrade`). For an upgrader, also
+record the target-purchase preferences (budget, segment, districts) here —
+the buyer workflow (`references/buyer.md`) reads the same profile.
+
+### 1b. Holdings
 
 `MemorySearch("sgprop:holding")` — see what's known. If a hit comes back,
-`MemoryGet(id)` to read the stored fields. If empty or the user is asking
-about a different unit, ask:
+`MemoryGet(id)` to read the stored fields. For **each** property the user
+owns (ask once per unit if empty or asking about a different unit):
 
 - address (block + unit number)
 - type: private / hdb
-- purchase date and price
+- purchase date and price — **`purchase_date` is mandatory**; SSD tiering
+  depends on it
 - current loan outstanding
 - remaining lease years
 - last renovation year
 - intent: `sell` (for an active listing) or `enbloc_wait` / `hold` (for
   passive exit planning)
 
-Persist by writing a new `sgprop:holding` record:
+Persist by writing a new `sgprop:holding` record (one per property — write
+the matrimonial home and any investment unit as **separate** records, each
+with its own `tags`):
 
 ```
 MemoryWrite(value="""sgprop:holding | Marine Blue #18-05

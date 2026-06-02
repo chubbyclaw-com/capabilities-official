@@ -94,8 +94,9 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
   (e.g. `client-<area>-YYYY-MM-DD`) and onboard now; ask for the name once
   you've shown first results, then rename via the update protocol.
 - This only applies to the agent role. For buyer/seller (the user's own
-  search), keep following §3 — persist the user's own `sgprop:profile`,
-  not a client record.
+  search), keep following §3 and §3b — persist the user's own
+  `sgprop:profile` (and a `sgprop:holding` per owned property), not a
+  client record.
 - **Requirement changes are captures too (HARD).** When a known client
   revises a stated requirement mid-conversation — budget, bedrooms,
   location, tenure, segment, timeline — treat it exactly like the initial
@@ -113,6 +114,31 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
   memory record first**, then optionally also create the artifact if they
   want a shareable document — never do only the artifact and leave the
   client's memory stale.
+
+### 3b. Capture the user's own situation proactively (buyer / seller — HARD)
+
+- When the user (acting for themselves, not as an agent) states their own
+  situation — income, cash / CPF, the properties they **own**, an upgrade /
+  sell plan — **or** asks you to "remember my situation / 记住我的情况 /
+  帮我存一下", persist it as the canonical envelope records **before or
+  alongside** any further analysis. Do **not** wait to be asked, and do
+  **not** write a single free-form summary memory.
+- **Decompose, never lump.** One logical entity = one record:
+  - identity / finance / ownership / intent / preferences → one
+    `sgprop:profile`, `tags=["sgprop:profile"]` (create with `MemoryWrite`
+    if none, else update in place per §3).
+  - **each property the user owns** → its own `sgprop:holding` record,
+    `tags=["sgprop:holding", "<address>"]`. An upgrader typically has ≥ 2
+    (the home being sold **plus** any investment unit). Always capture each
+    holding's `purchase_date` — SSD tiering depends on it.
+  - a multi-step plan (e.g. sell-first / buy-first sequencing, an SSD-cliff
+    wait) goes in the profile's `notes` or a `sgprop:note`, **not** into tags.
+- **Never substitute ad-hoc descriptive tags** (`"property-portfolio"`,
+  `"upgrade-plan"`, `"absd"`, `"ssd"`) for the canonical `sgprop:*` atoms.
+  The retrieval SOP (§2) searches `sgprop:profile` / `sgprop:holding`; a
+  freestyle-tagged record will not be found and the next session re-asks
+  everything. Follow `references/seller.md` §1 and
+  `references/memory-conventions.md`.
 
 ### 4. Memory access rules (HARD)
 

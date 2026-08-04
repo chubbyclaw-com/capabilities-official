@@ -4,18 +4,17 @@ Official ChubbyClaw-managed directory of high quality capabilities.
 
 ## Schema
 
-- [SCHEMA.md](./SCHEMA.md) — Schema reference (English)
-- [SCHEMA.zh.md](./SCHEMA.zh.md) — Schema 参考（中文）
+[SCHEMA.md](./SCHEMA.md) is the complete capability manifest schema: repository detection, the marketplace manifest (`marketplace.json`), the capability manifest (`capability.json`), credential declarations (including wiring a credential to a remote MCP server), and the capability directory layout conventions.
 
-The schema covers repository detection, the marketplace manifest (`marketplace.json`), the capability manifest (`capability.json`), credential declarations, and the capability directory layout conventions.
+It is kept byte-for-byte identical to the "Capability Creator" wizard built into the ChubbyClaw platform — the same file drives both the in-app authoring flow and this reference, so there is exactly one place that can drift. `SCHEMA.zh.md` has been retired for the same reason (a hand-kept translation is a second copy that silently goes stale); its content now just points here.
 
 ## Adding a Capability
 
 To add a capability to this marketplace:
 
 1. Create a directory under `capabilities/`
-2. Add `.chubbyclaw/capability.json` with `name`, `description`, and `author`
-3. If the capability needs API keys or OAuth connections, declare them in `credentials` (see [SCHEMA.md](./SCHEMA.md#credential-declarations))
+2. Add `.chubbyclaw/capability.json` with `name` and `description`
+3. If the capability needs API keys or OAuth connections, declare them in `credentials` (see the Credentials section in [SCHEMA.md](./SCHEMA.md))
 4. Add skills under `skills/<skill-name>/SKILL.md`
 5. Add MCP tools in `.mcp.json` (if applicable)
 6. Add an entry to `.chubbyclaw/marketplace.json`

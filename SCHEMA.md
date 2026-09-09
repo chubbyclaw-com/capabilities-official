@@ -82,6 +82,7 @@ Each entry:
 | `provider`     | `oauth` only | yes                         | `"google"`, `"github"`, `"slack"`, `"notion"`, `"gitlab"`, or `"custom"`.                                                      |
 | `scopes`       | `oauth` only | conditional                 | OAuth scopes to request. **Required if `mcps` is non-empty**, unless the provider has no scope concept (today: only `notion`). |
 | `mcps`         | `oauth` only | no                          | **Which `.mcp.json` server(s) this credential authorizes.** See below — this is the field that actually wires auth to a call.  |
+| `api_hosts`    | `api_key` only | **effectively yes**       | **Which hosts this key may be sent to.** Omit it and the key is never substituted on any outbound request — see below.         |
 | `required`     | both         | no                          | Whether the capability needs this credential to run. Defaults to `true`.                                                       |
 | `description`  | both         | no                          | Human-readable text shown in the credential picker.                                                                            |
 | `help_url`     | `api_key`    | no                          | Link to where the user gets the key.                                                                                           |
@@ -133,8 +134,55 @@ Validation at install time (violating any of these gets the install rejected wit
 | every name in `mcps` must exist as a key in `.mcp.json`                                                                         |
 | a given `.mcp.json` server name can be claimed by at most one credential                                                        |
 | `type:"oauth"` + `mcps` non-empty ⇒ `scopes` must be non-empty (exempt only for providers with no scope concept, e.g. `notion`) |
+| `api_hosts` may appear on `type:"api_key"` only; each entry must be a bare **lowercase** hostname (no scheme, port, path, or wildcard) and must not repeat |
 
 `type:"api_key"` credentials are not subject to the scopes rule and are not currently wired to remote MCP servers via `mcps` — they're injected as env vars into the capability's process/container as before.
+
+#### `api_hosts` — where an API key is allowed to go (read this before shipping any `api_key` credential)
+
+**The env var no longer holds the real key.** Inside the capsule, `$TAVILY_API_KEY`
+is an opaque placeholder like `cc_ph_0123…`. Every outbound HTTPS request leaves
+through the platform's egress proxy, which swaps that placeholder for the real key —
+**but only for hosts you declared in `api_hosts`**.
+
+```jsonc
+{
+  "credentials": [
+    {
+      "name": "GITLAB_TOKEN",
+      "type": "api_key",
+      "api_hosts": ["gitlab.com"], // the key is substituted only on these hosts
+      "help_url": "https://gitlab.com/-/user_settings/personal_access_tokens"
+    }
+  ]
+}
+```
+
+Matching is **suffix-based on label boundaries**: `gitlab.com` also covers
+`api.gitlab.com` and `registry.gitlab.com`, but not `notgitlab.com` and not
+`gitlab.com.evil.tld`.
+
+**Omitting `api_hosts` is not "no restriction" — it is "no permission."** The
+placeholder is still injected and your code still reads it, but it is never swapped
+for anything. The request goes out carrying the literal `cc_ph_…` string, and the
+upstream API answers **401** — with nothing in the error to suggest the cause is a
+missing declaration in `capability.json`. The credential-binding screen shows the
+user a warning when a slot declares no hosts, which is usually how this gets caught.
+
+Two more things worth knowing:
+
+- **This applies to `api_key` only.** `oauth` credentials get their allowed hosts
+  from the provider's own table (Google, GitHub, Notion), so declaring `api_hosts`
+  on an `oauth` credential is **rejected at install time** — two sources of truth
+  for the same question have no correct answer when they disagree.
+- **The `gitlab` and `slack` presets have no provider host table** (their OAuth apps
+  are registered by the user and may point at a self-hosted instance, so the platform
+  cannot know where the token legitimately goes). To use GitLab inside a capsule,
+  ship an `api_key` credential with `api_hosts` rather than an `oauth` one.
+
+Also note that **plain HTTP is never substituted** — real credentials only ever appear
+on an encrypted connection. If a tool of yours talks to `http://…`, it will receive the
+placeholder.
 
 #### Custom OAuth provider (`oauth_config`)
 

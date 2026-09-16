@@ -82,7 +82,7 @@ Each entry:
 | `provider`     | `oauth` only | yes                         | `"google"`, `"github"`, `"slack"`, `"notion"`, `"gitlab"`, or `"custom"`.                                                      |
 | `scopes`       | `oauth` only | conditional                 | OAuth scopes to request. **Required if `mcps` is non-empty**, unless the provider has no scope concept (today: only `notion`). |
 | `mcps`         | `oauth` only | no                          | **Which `.mcp.json` server(s) this credential authorizes.** See below — this is the field that actually wires auth to a call.  |
-| `api_hosts`    | `api_key` only | recommended                 | **Hosts your code needs the key for.** Checked against the user's key at bind time; substitution happens on the intersection — see below. |
+| `api_hosts`    | `api_key` only | no                          | **Usually unnecessary** — name the credential after the service (`GITLAB_TOKEN`) and hosts come from the catalog. Write it only for services outside the catalog, to narrow, or to make the bind checked — see below. |
 | `required`     | both         | no                          | Whether the capability needs this credential to run. Defaults to `true`.                                                       |
 | `description`  | both         | no                          | Human-readable text shown in the credential picker.                                                                            |
 | `help_url`     | `api_key`    | no                          | Link to where the user gets the key.                                                                                           |
@@ -145,39 +145,46 @@ opaque placeholder like `cc_ph_0123…`. Every outbound HTTPS request leaves thr
 platform's egress proxy, which swaps that placeholder for the real key — **only on hosts
 the key is allowed to go to**.
 
-Two places declare hosts, and they play different roles:
+**In most cases you write nothing.** Name the credential after the service and the
+platform already knows where it goes, what it is called, and where the user gets it:
 
-| Where                                       | Who writes it                         | Meaning                                                                                 |
-| ------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------- |
-| **the credential itself** (user's key store) | the user, when saving the key         | the hosts this key may ever be sent to — the key's own property, independent of you     |
-| `api_hosts` in `capability.json`            | you, the capability author            | the hosts your code **needs** — a requirement checked when the user binds a key to it   |
+| `name`              | service        | hosts                              |
+| ------------------- | -------------- | ---------------------------------- |
+| `GITLAB_TOKEN`      | GitLab         | gitlab.com                         |
+| `GH_TOKEN`          | GitHub         | github.com                         |
+| `OPENAI_API_KEY`    | OpenAI         | api.openai.com                     |
+| `ANTHROPIC_API_KEY` | Anthropic      | api.anthropic.com                  |
+| `DEEPSEEK_API_KEY`  | DeepSeek       | api.deepseek.com                   |
+| `OPENROUTER_API_KEY`| OpenRouter     | openrouter.ai                      |
+| `GEMINI_API_KEY`    | Google Gemini  | generativelanguage.googleapis.com  |
+| `TAVILY_API_KEY`    | Tavily         | api.tavily.com                     |
+| `NOTION_TOKEN`      | Notion         | api.notion.com                     |
+| `SLACK_TOKEN`       | Slack          | slack.com                          |
 
 ```jsonc
 {
   "credentials": [
-    {
-      "name": "GITLAB_TOKEN",
-      "type": "api_key",
-      "api_hosts": ["gitlab.com"], // "my code talks to gitlab.com" — the user's key must cover it
-      "help_url": "https://gitlab.com/-/user_settings/personal_access_tokens"
-    }
+    { "name": "GITLAB_TOKEN", "type": "api_key" } // that's it — hosts come from the catalog
   ]
 }
 ```
 
-What happens with the two lists:
+With a catalog name, the binding screen previews the hosts, a key the user creates
+right there gets them automatically, and an existing key that lacks them gets a
+one-click "add and bind". The catalog hosts are a **suggestion**, not a requirement: a
+user binding a self-hosted GitLab key (`gitlab.example.internal`) is not rejected.
 
-- **At bind time** the user's key must cover every host you declared; otherwise the
-  bind is rejected (`credential.hostsNotCovered`) and the user sees which hosts are
-  missing. Declaring `api_hosts` is how you make that check happen — it turns a
-  silent 401 at runtime into a clear message before the key is ever used.
-- **At request time** the placeholder is swapped on the **intersection** of the two
-  lists, narrower entry wins: your `gitlab.com` ∩ the user's `api.gitlab.com` =
-  `api.gitlab.com` only.
-- **If you omit `api_hosts`**, the key is swapped wherever *the user's key* allows —
-  you are not restricting anything, and you get no bind-time check. Prefer declaring
-  the hosts you actually use; it is the only way the user learns up front that their
-  key is scoped too narrowly for your capability.
+**Write `api_hosts` only when you need more than the catalog gives you:**
+
+- the service is not in the catalog (`"name": "ACME_TOKEN", "api_hosts": ["api.acme.io"]`);
+- you want to **narrow** where the key may go (`"name": "GITLAB_TOKEN", "api_hosts": ["api.gitlab.com"]`);
+- you want the bind to be **checked**: declared hosts are a requirement — the user's key
+  must cover them or the bind is rejected (`credential.hostsNotCovered`) with a one-click
+  fix that adds the missing hosts to the key.
+
+At request time the placeholder is swapped on the **intersection** of the key's own hosts
+and your declared hosts, narrower entry wins: your `gitlab.com` ∩ the user's
+`api.gitlab.com` = `api.gitlab.com` only.
 
 Matching is **suffix-based on label boundaries**: `gitlab.com` also covers
 `api.gitlab.com` and `registry.gitlab.com`, but not `notgitlab.com` and not
@@ -186,11 +193,10 @@ path, or wildcard.
 
 Two more things worth knowing:
 
-- **This applies to `api_key` only.** `oauth` credentials with a platform provider
-  table (Google, GitHub, Notion) get their hosts from that table, so declaring
-  `api_hosts` on an `oauth` credential is **rejected at install time**. For `gitlab`
-  and `slack` OAuth (no platform table — the app may point at a self-hosted instance)
-  the hosts come from the credential itself, set by the user when they connect it.
+- **This applies to `api_key` only.** `oauth` credentials get their hosts from the
+  credential itself (pre-filled from the platform provider table when the user connects
+  Google / GitHub / Notion; typed by the user for `gitlab` / `slack` / custom providers),
+  so declaring `api_hosts` on an `oauth` credential is **rejected at install time**.
 - **Users can also hand a key to an agent without any capability** ("direct
   credential"). That path has no manifest at all: the key is swapped on exactly the
   hosts stored on the key. It is how a plain CLI (`glab`, `gh`, …) installed ad hoc

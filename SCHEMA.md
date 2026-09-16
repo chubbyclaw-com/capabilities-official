@@ -82,7 +82,7 @@ Each entry:
 | `provider`     | `oauth` only | yes                         | `"google"`, `"github"`, `"slack"`, `"notion"`, `"gitlab"`, or `"custom"`.                                                      |
 | `scopes`       | `oauth` only | conditional                 | OAuth scopes to request. **Required if `mcps` is non-empty**, unless the provider has no scope concept (today: only `notion`). |
 | `mcps`         | `oauth` only | no                          | **Which `.mcp.json` server(s) this credential authorizes.** See below — this is the field that actually wires auth to a call.  |
-| `api_hosts`    | `api_key` only | **effectively yes**       | **Which hosts this key may be sent to.** Omit it and the key is never substituted on any outbound request — see below.         |
+| `api_hosts`    | `api_key` only | recommended                 | **Hosts your code needs the key for.** Checked against the user's key at bind time; substitution happens on the intersection — see below. |
 | `required`     | both         | no                          | Whether the capability needs this credential to run. Defaults to `true`.                                                       |
 | `description`  | both         | no                          | Human-readable text shown in the credential picker.                                                                            |
 | `help_url`     | `api_key`    | no                          | Link to where the user gets the key.                                                                                           |
@@ -140,10 +140,17 @@ Validation at install time (violating any of these gets the install rejected wit
 
 #### `api_hosts` — where an API key is allowed to go (read this before shipping any `api_key` credential)
 
-**The env var no longer holds the real key.** Inside the capsule, `$TAVILY_API_KEY`
-is an opaque placeholder like `cc_ph_0123…`. Every outbound HTTPS request leaves
-through the platform's egress proxy, which swaps that placeholder for the real key —
-**but only for hosts you declared in `api_hosts`**.
+**The env var never holds the real key.** Inside the capsule, `$GITLAB_TOKEN` is an
+opaque placeholder like `cc_ph_0123…`. Every outbound HTTPS request leaves through the
+platform's egress proxy, which swaps that placeholder for the real key — **only on hosts
+the key is allowed to go to**.
+
+Two places declare hosts, and they play different roles:
+
+| Where                                       | Who writes it                         | Meaning                                                                                 |
+| ------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------- |
+| **the credential itself** (user's key store) | the user, when saving the key         | the hosts this key may ever be sent to — the key's own property, independent of you     |
+| `api_hosts` in `capability.json`            | you, the capability author            | the hosts your code **needs** — a requirement checked when the user binds a key to it   |
 
 ```jsonc
 {
@@ -151,34 +158,43 @@ through the platform's egress proxy, which swaps that placeholder for the real k
     {
       "name": "GITLAB_TOKEN",
       "type": "api_key",
-      "api_hosts": ["gitlab.com"], // the key is substituted only on these hosts
+      "api_hosts": ["gitlab.com"], // "my code talks to gitlab.com" — the user's key must cover it
       "help_url": "https://gitlab.com/-/user_settings/personal_access_tokens"
     }
   ]
 }
 ```
 
+What happens with the two lists:
+
+- **At bind time** the user's key must cover every host you declared; otherwise the
+  bind is rejected (`credential.hostsNotCovered`) and the user sees which hosts are
+  missing. Declaring `api_hosts` is how you make that check happen — it turns a
+  silent 401 at runtime into a clear message before the key is ever used.
+- **At request time** the placeholder is swapped on the **intersection** of the two
+  lists, narrower entry wins: your `gitlab.com` ∩ the user's `api.gitlab.com` =
+  `api.gitlab.com` only.
+- **If you omit `api_hosts`**, the key is swapped wherever *the user's key* allows —
+  you are not restricting anything, and you get no bind-time check. Prefer declaring
+  the hosts you actually use; it is the only way the user learns up front that their
+  key is scoped too narrowly for your capability.
+
 Matching is **suffix-based on label boundaries**: `gitlab.com` also covers
 `api.gitlab.com` and `registry.gitlab.com`, but not `notgitlab.com` and not
-`gitlab.com.evil.tld`.
-
-**Omitting `api_hosts` is not "no restriction" — it is "no permission."** The
-placeholder is still injected and your code still reads it, but it is never swapped
-for anything. The request goes out carrying the literal `cc_ph_…` string, and the
-upstream API answers **401** — with nothing in the error to suggest the cause is a
-missing declaration in `capability.json`. The credential-binding screen shows the
-user a warning when a slot declares no hosts, which is usually how this gets caught.
+`gitlab.com.evil.tld`. Entries must be bare lowercase hostnames — no scheme, port,
+path, or wildcard.
 
 Two more things worth knowing:
 
-- **This applies to `api_key` only.** `oauth` credentials get their allowed hosts
-  from the provider's own table (Google, GitHub, Notion), so declaring `api_hosts`
-  on an `oauth` credential is **rejected at install time** — two sources of truth
-  for the same question have no correct answer when they disagree.
-- **The `gitlab` and `slack` presets have no provider host table** (their OAuth apps
-  are registered by the user and may point at a self-hosted instance, so the platform
-  cannot know where the token legitimately goes). To use GitLab inside a capsule,
-  ship an `api_key` credential with `api_hosts` rather than an `oauth` one.
+- **This applies to `api_key` only.** `oauth` credentials with a platform provider
+  table (Google, GitHub, Notion) get their hosts from that table, so declaring
+  `api_hosts` on an `oauth` credential is **rejected at install time**. For `gitlab`
+  and `slack` OAuth (no platform table — the app may point at a self-hosted instance)
+  the hosts come from the credential itself, set by the user when they connect it.
+- **Users can also hand a key to an agent without any capability** ("direct
+  credential"). That path has no manifest at all: the key is swapped on exactly the
+  hosts stored on the key. It is how a plain CLI (`glab`, `gh`, …) installed ad hoc
+  in the sandbox gets to use the user's token.
 
 Also note that **plain HTTP is never substituted** — real credentials only ever appear
 on an encrypted connection. If a tool of yours talks to `http://…`, it will receive the

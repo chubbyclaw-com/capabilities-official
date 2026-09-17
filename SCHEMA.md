@@ -235,14 +235,14 @@ Interview the user, one topic at a time, then write the files.
 4. **Body** — what should the skill actually make the agent do? Capture their workflow/instructions as the SKILL.md body.
 5. **MCP server?** — ask if it needs one. If yes, also ask whether it needs a credential (API key or OAuth) and which server(s) it should apply to — follow **MCP servers** and **Credentials** above.
 6. **Write the files** — pick the group + topic + folder with the user, then use `create_artifact`/`update_artifact` to write `.chubbyclaw/capability.json` and `skills/<name>/SKILL.md` (and `.mcp.json` if applicable) under `<package>/…`.
-7. **Self-check, then hand off** — run the self-check below, then tell the user to review the files and **install the package from its card in the group files**. Do not install it yourself.
+7. **Self-check, then hand off** — run the self-check below, then tell the user to review the files and **install the package from its card in the group files**, where they choose which agents to add it to. Do not install it yourself.
 
 ## Flow B — Edit an existing package draft
 
 1. **Read first.** Use `list_artifacts`/`read_artifact` to see the current package folder and its files before changing anything. Never blind-write.
 2. **Make precise edits.** Use `update_artifact` with `edits: [{old_string, new_string}]` for targeted changes; replace whole `content` only when rewriting a file.
 3. **Renaming.** If the user wants to rename the capability, tell them plainly: the manifest `name` is the capability's identity, so renaming is treated as a **new capability**, not an in-place rename. Keep the original `name`, or create a new package under the new name.
-4. **If the capability is already installed** by this user: after you finish editing the package files, call `update_installed_capability` with the manifest `name` to apply the changes. Do **not** ask the user to reinstall it.
+4. **If the capability is already installed** by this user: after you finish editing the package files, call `update_installed_capability` with the manifest `name` to apply the changes; they take effect on every agent the capability is added to. Do **not** ask the user to reinstall it. If the tool reports that no capability with that name is available to this agent, the package is either not installed or not added to you — ask the user to add it to this agent (or, if they never installed it, to install it from the package card and add it to this agent) instead of reinstalling.
 5. **Debugging a 401/403 from a remote MCP server** — re-read `capability.json`'s `credentials[].mcps` first. A missing or wrong entry there (not the credential binding itself) is the most common cause — see the common-mistake callout under **Credentials** above.
 
 ## Flow C — Fork an installed capability, then edit
@@ -269,8 +269,8 @@ A proposal is **exactly a draft package** (Flow A), nothing more:
    as a reusable skill?") and draft the package into the group files with the normal tools.
 2. **It is only a proposal until the user applies it.** Drafting the files does **not** make
    the skill active or callable. The capability starts working only after the user installs it
-   from the package card in the group-file UI — you never install it, and you cannot use the
-   proposed skill until they do.
+   from the package card in the group-file UI and adds it to an agent — you never install it,
+   and you cannot use the proposed skill until it is added to you.
 3. If the user is not interested, leave the draft or offer to delete it; do not push. An
    un-applied proposal simply stays a draft and never takes effect.
 
@@ -364,11 +364,11 @@ Before telling the user the package is ready:
 2. Re-read the manifest: `name` is kebab-case, `description` present, `icon` (if any) is a single emoji.
 3. If `credentials` is present: every `oauth` entry with a non-empty `mcps` has non-empty `scopes` (unless the provider has no scope concept), every name in every `mcps` array exists as a key in `.mcp.json`, and no `.mcp.json` server is claimed by more than one credential.
 4. Re-read each SKILL.md: frontmatter `name` matches its directory, `description` present and written as a clear "use when…".
-5. Only then tell the user to install it from the package card.
+5. Only then tell the user to install it from the package card and choose which agents to add it to.
 
 ## Hard rules
 
-- **Draft and edit only.** Never install a package yourself — initial installation requires the user's explicit confirmation in the UI. The only apply-without-UI case is `update_installed_capability` for a package the user has **already** installed (Flow B step 4).
+- **Draft and edit only.** Never install a package yourself — initial installation requires the user's explicit confirmation in the UI, where they also choose which agents to add it to. The only apply-without-UI case is `update_installed_capability` for a package the user has **already** installed and added to you (Flow B step 4).
 - **Stop at the group files.** Your job ends when the package is correctly drafted/edited in the artifacts.
 - **Keep the identity stable.** Never silently change a manifest `name`.
 - **Credential wiring lives in `capability.json`, never in `.mcp.json`.** A `credential` (or similarly named) key on a `.mcp.json` server entry does nothing but get silently dropped — always use `credentials[].mcps`.

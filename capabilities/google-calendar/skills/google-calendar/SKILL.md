@@ -74,7 +74,13 @@ curl -sS -H "$AUTH" "$API/calendars/primary/events/<eventId>"
 To check availability, list the events in the range and report the gaps.
 
 Use a calendar's `id` from the calendar list in place of `primary` to work with another
-calendar. `primary` is the default unless the user names another calendar.
+calendar. `primary` is the default unless the user names another calendar. Calendar IDs
+can contain `#` and `@`, so URL-encode them before putting them in the path:
+
+```bash
+CAL=$(jq -rn --arg id "<calendarId>" '$id|@uri')
+curl -sS -H "$AUTH" "$API/calendars/$CAL/events?maxResults=10"
+```
 
 ## Writing — confirm first
 
@@ -128,9 +134,10 @@ Check the HTTP status (`curl -w '%{http_code}'`) or the `error` object in the re
 - `403` with `insufficientPermissions` or `ACCESS_TOKEN_SCOPE_INSUFFICIENT` — the user
   did not grant calendar access when connecting. Ask them to reconnect and allow calendar
   access.
-- `403` on a specific calendar — the user can read but not edit that calendar
+- `403` with `requiredAccessLevel` — the user can read but not edit that calendar
   (`accessRole` is `reader` or `freeBusyReader`). Say so.
-- `404` — the event or calendar does not exist or was deleted.
+- `404` — the event or calendar does not exist. A deleted event may instead still be
+  returned with `"status": "cancelled"`; treat that as deleted.
 - `429` or `5xx` — wait a few seconds and retry once, then report the failure.
 
 ## Showing results

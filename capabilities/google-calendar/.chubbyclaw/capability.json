@@ -1,0 +1,25 @@
+{
+  "name": "google-calendar",
+  "description": "View and manage Google Calendar events: list calendars, find events, and create, update or delete events after the user confirms. Use for any question about the user's Google Calendar schedule.",
+  "version": "1.0.0",
+  "icon": "📅",
+  "author": {
+    "name": "ChubbyClaw",
+    "email": "support@chubbyclaw.com"
+  },
+  "credentials": [
+    {
+      "name": "GOOGLE_OAUTH",
+      "type": "oauth",
+      "provider": "google",
+      "description": "Google account whose calendars the assistant reads and edits",
+      "scopes": [
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+        "https://www.googleapis.com/auth/calendar.events"
+      ]
+    }
+  ]
+}

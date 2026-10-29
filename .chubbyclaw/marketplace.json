@@ -38,6 +38,12 @@
       "description": "Singapore property decision assistant — buyer / seller / agent workflows backed by URA + HDB + rental data.",
       "category": "location",
       "source": "./capabilities/singapore-property"
+    },
+    {
+      "name": "google-calendar",
+      "description": "View and manage your Google Calendar events: see your schedule, find free time, and create, update or delete events.",
+      "category": "productivity",
+      "source": "./capabilities/google-calendar"
     }
   ]
 }

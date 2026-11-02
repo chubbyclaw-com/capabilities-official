@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Claude Code Auto-Formatting Hook
-# Automatically formats source code files after Claude edits them.
+# Claude Code and Codex Auto-Formatting Hook
+# Automatically formats source code files after an agent edits them.
 #
 # Strategy:
 #   1. Honor project orchestrator (treefmt / dprint) if configured.
@@ -15,44 +15,39 @@
 # Originally adapted from https://github.com/ryanlewis/claude-format-hook (MIT).
 
 json_input=$(cat)
+paths_file=$(mktemp 2>/dev/null) || exit 0
+err_file=""
+if command -v jq &> /dev/null; then
+    err_file=$(mktemp 2>/dev/null)
+fi
+trap 'rm -f "$paths_file" ${err_file:+"$err_file"}' EXIT
 
 if command -v jq &> /dev/null; then
-    file_path=$(printf '%s' "$json_input" | jq -r '.tool_input.file_path // empty')
+    printf '%s' "$json_input" | jq -r '.tool_input.file_path // empty' >> "$paths_file"
+
+    if [ "$(printf '%s' "$json_input" | jq -r '.tool_name // empty')" = "apply_patch" ]; then
+        printf '%s' "$json_input" \
+            | jq -r '.tool_input.command // empty' \
+            | sed -n \
+                -e 's/^\*\*\* Add File: //p' \
+                -e 's/^\*\*\* Update File: //p' \
+                -e 's/^\*\*\* Move to: //p' \
+            >> "$paths_file"
+    fi
 else
-    file_path=$(printf '%s' "$json_input" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+    # Claude Code fallback for hosts without jq. Codex apply_patch input is
+    # multiline JSON and requires jq for reliable decoding.
+    printf '%s' "$json_input" \
+        | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' \
+        | sed 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
+        >> "$paths_file"
 fi
-
-if [ -z "$file_path" ] || [ ! -f "$file_path" ]; then
-    exit 0
-fi
-
-case "$file_path" in
-    /*) ;;
-    *) file_path="$PWD/$file_path" ;;
-esac
-
-case "$file_path" in
-    */node_modules/*|*/vendor/*|*/dist/*|*/build/*|*/out/*|\
-    */.venv/*|*/venv/*|*/__pycache__/*|*/target/*|\
-    */.next/*|*/.nuxt/*|*/.turbo/*|*/.cache/*|*/coverage/*)
-        exit 0
-        ;;
-esac
-
-file_dir=$(dirname "$file_path")
-basename="${file_path##*/}"
-extension="${basename##*.}"
-[ "$extension" = "$basename" ] && extension=""
-extension=$(printf '%s' "$extension" | tr '[:upper:]' '[:lower:]')
 
 # Error accumulator. Reporting requires jq (to build valid JSON).
 # Without jq we silently degrade.
 errors=""
-err_file=""
-if command -v jq &> /dev/null; then
-    err_file=$(mktemp 2>/dev/null)
-    [ -n "$err_file" ] && trap 'rm -f "$err_file"' EXIT
-fi
+file_path=""
+file_dir=""
 
 # Runs a formatter. Captures stderr and the exit code; on failure, appends
 # a diagnostic line to the errors accumulator. Always returns 0.
@@ -98,13 +93,12 @@ find_up() {
     return 1
 }
 
-emit_and_exit() {
+emit_result() {
     if [ -n "$errors" ] && [ -n "$err_file" ]; then
-        local msg="claude-format-hook: formatter(s) reported issues while processing ${file_path}:${errors}"
+        local msg="claude-format-hook: formatter(s) reported issues:${errors}"
         jq -nc --arg ctx "$msg" \
             '{hookSpecificOutput:{hookEventName:"PostToolUse",additionalContext:$ctx}}'
     fi
-    exit 0
 }
 
 has_biome_config() {
@@ -118,16 +112,42 @@ has_prettier_config() {
         prettier.config.js prettier.config.cjs prettier.config.mjs &> /dev/null
 }
 
+format_file() {
+    file_path="$1"
+
+    if [ -z "$file_path" ] || [ ! -f "$file_path" ]; then
+        return 0
+    fi
+
+    case "$file_path" in
+        /*) ;;
+        *) file_path="$PWD/$file_path" ;;
+    esac
+
+    case "$file_path" in
+        */node_modules/*|*/vendor/*|*/dist/*|*/build/*|*/out/*|\
+        */.venv/*|*/venv/*|*/__pycache__/*|*/target/*|\
+        */.next/*|*/.nuxt/*|*/.turbo/*|*/.cache/*|*/coverage/*)
+            return 0
+            ;;
+    esac
+
+    file_dir=$(dirname "$file_path")
+    local basename="${file_path##*/}"
+    local extension="${basename##*.}"
+    [ "$extension" = "$basename" ] && extension=""
+    extension=$(printf '%s' "$extension" | tr '[:upper:]' '[:lower:]')
+
 # ----- Phase 1: project-level orchestrators -----
 
 if command -v treefmt &> /dev/null && find_up "$file_dir" treefmt.toml .treefmt.toml &> /dev/null; then
     run_fmt treefmt treefmt "$file_path"
-    emit_and_exit
+    return 0
 fi
 
 if command -v dprint &> /dev/null && find_up "$file_dir" dprint.json dprint.jsonc .dprint.json &> /dev/null; then
     run_fmt dprint dprint fmt "$file_path"
-    emit_and_exit
+    return 0
 fi
 
 # ----- Phase 2: per-extension, project-preference aware -----
@@ -214,4 +234,10 @@ case "$extension" in
         ;;
 esac
 
-emit_and_exit
+}
+
+while IFS= read -r candidate; do
+    format_file "$candidate"
+done < <(awk 'NF && !seen[$0]++' "$paths_file")
+
+emit_result

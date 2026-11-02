@@ -37,7 +37,7 @@ A capability package is a folder in the group files with this layout:
 | `name`        | yes      | kebab-case (lowercase letters, digits, hyphens only). This is the capability's **immutable identity** — renaming it is a brand-new capability, not a rename (see "Renaming" in Flow B). |
 | `description` | yes      | One plain sentence — shown in the UI and injected into the agent's system prompt.                                                                                                       |
 | `version`     | no       | Semver string, e.g. `"1.1.0"`. Defaults to `"1.0.0"` if omitted.                                                                                                                        |
-| `icon`        | no       | A **single emoji** only. Anything that is not exactly one emoji is dropped.                                                                                                             |
+| `icon`        | no       | Either a **single emoji**, or the path of an image file inside the package, relative to the package root (e.g. `.chubbyclaw/icon.png`). The image must be PNG, JPEG or WebP and at most 32 KB; SVG is not supported. Anything else is dropped. Do not guess a logo from the name: without an `icon`, the package gets a generic icon.                                                                                                             |
 | `credentials` | no       | API key / OAuth declarations this capability needs. See **Credentials** below. Omitting it entirely falls back to free-form env overrides.                                              |
 
 There is no `author` field — a `capability.json` with one is not rejected, but nothing reads it; don't tell a user it will show up anywhere.
@@ -361,7 +361,7 @@ Both follow the same directory-convention discovery as the group-files package a
 Before telling the user the package is ready:
 
 1. `list_artifacts` the package folder and confirm `.chubbyclaw/capability.json` and at least one `skills/<name>/SKILL.md` exist.
-2. Re-read the manifest: `name` is kebab-case, `description` present, `icon` (if any) is a single emoji.
+2. Re-read the manifest: `name` is kebab-case, `description` present, `icon` (if any) is a single emoji, or a package-relative path to a PNG/JPEG/WebP image (at most 32 KB) that exists in the package.
 3. If `credentials` is present: every `oauth` entry with a non-empty `mcps` has non-empty `scopes` (unless the provider has no scope concept), every name in every `mcps` array exists as a key in `.mcp.json`, and no `.mcp.json` server is claimed by more than one credential.
 4. Re-read each SKILL.md: frontmatter `name` matches its directory, `description` present and written as a clear "use when…".
 5. Only then tell the user to install it from the package card and choose which agents to add it to.

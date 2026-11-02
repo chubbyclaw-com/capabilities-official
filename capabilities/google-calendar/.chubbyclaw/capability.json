@@ -2,6 +2,7 @@
   "name": "google-calendar",
   "description": "View and manage Google Calendar events: list calendars, find events, and create, update or delete events after the user confirms. Use for any question about the user's Google Calendar schedule.",
   "version": "1.0.0",
+  "icon": ".chubbyclaw/icon.png",
   "author": {
     "name": "ChubbyClaw",
     "email": "support@chubbyclaw.com"

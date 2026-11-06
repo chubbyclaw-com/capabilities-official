@@ -45,6 +45,13 @@
       "category": "productivity",
       "source": "./capabilities/google-calendar",
       "icon": ".chubbyclaw/icon.png"
+    },
+    {
+      "name": "google-drive",
+      "description": "Work on the Google Drive files you pick: read Docs, Sheets and Slides, create folders and upload files, make precise edits, and move files to the trash. It never permanently deletes anything or sees the rest of your Drive.",
+      "category": "productivity",
+      "source": "./capabilities/google-drive",
+      "icon": ".chubbyclaw/icon.png"
     }
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "name": "google-drive",
+  "description": "Read, create and edit the Google Drive files the user picks for this assistant. In chat, the assistant sends a link that opens Google's file picker; it can then list and read the picked Docs, Sheets, Slides and other files, create files and folders (in a picked folder or My Drive), make precise edits to Docs and Sheets, and move files to the trash after the user confirms. It cannot permanently delete anything, see the rest of the Drive, or see what was already inside a picked folder. Use for any request about the user's Google Drive files or folders.",
+  "version": "1.0.0",
+  "icon": ".chubbyclaw/icon.png",
+  "author": {
+    "name": "ChubbyClaw",
+    "email": "support@chubbyclaw.com"
+  }
+}

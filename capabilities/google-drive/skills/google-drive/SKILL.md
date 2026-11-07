@@ -23,18 +23,16 @@ but you cannot see what was already in it. Never claim you looked through a fold
 When Drive is not connected yet, or the user mentions a file that is not in
 `gdrive_list_files`:
 
-1. Call `gdrive_pick_files`. It returns a link that opens Google's file picker and a
-   `pick_id`.
+1. Call `gdrive_pick_files`. It returns a link that opens Google's file picker.
 2. Ask with `AskUserQuestion`, in the user's language: one `radio` question whose label
    carries the link as a Markdown link — for example
    `[Open Google Drive](<link>) and pick the files, then choose Done. The link works for 10 minutes.`
    — with two options meaning "Done" and "Cancel". Do not paste the link anywhere else.
-3. When they answer Done, call `gdrive_wait_for_pick` with the `pick_id`. If it returns
-   `pending`, call it again (the picker may still be finishing); after a few `pending`
-   results, ask whether they finished picking.
-4. On `done`, continue the task with the picked files. On `cancelled`, `failed` or
-   `expired`, tell the user plainly (the result says why) and offer a new link. If they
-   answered Cancel, stop and do not call `gdrive_wait_for_pick`.
+3. When they answer Done, call `gdrive_list_files`: the files they picked are in it.
+   If none of the expected files appear, ask them to confirm the picker finished and the
+   confirmation page said the file was added; if it did not, offer a new link.
+4. If they answered Cancel, stop and post nothing else. Do not claim a pick succeeded
+   without seeing the file in `gdrive_list_files`.
 
 The picker connects **your owner's** Google account (the person who set you up), so ask
 your owner to open the link. If someone else in the group asks you to use a file you

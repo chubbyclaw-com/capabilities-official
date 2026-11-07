@@ -1,7 +1,7 @@
 {
   "name": "google-drive",
   "description": "Read, create and edit the Google Drive files the user picks for this assistant. In chat, the assistant sends a link that opens Google's file picker; it can then list the picked files, create files and folders (in a picked folder or My Drive), and call any Google Sheets, Docs or Drive REST method through a generic API proxy — reading and writing sheet ranges, formatting, rows, validation, filters, charts, and editing Docs. It cannot permanently delete anything, change sharing, see the rest of the Drive, or see what was already inside a picked folder. Use for any request about the user's Google Drive files or folders.",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "icon": ".chubbyclaw/icon.png",
   "author": {
     "name": "ChubbyClaw",

@@ -100,7 +100,8 @@ days. Before calling it, name the exact file and get the user's explicit "yes" i
 Never trash several files on one vague instruction.
 
 You can never permanently delete anything — `drive.files.delete` is blocked, and there is
-no tool for it. Sharing and permission changes (`drive.permissions.*`) are blocked too.
+no tool for it. Also blocked: `drive.permissions.*`, `drive.drives.*` / `drive.teamdrives.*`,
+`drive.changes.*` and `drive.files.list` (use `gdrive_list_files` instead).
 If the user wants a file gone for good, tell them to empty the Drive trash themselves.
 
 ## Disconnecting

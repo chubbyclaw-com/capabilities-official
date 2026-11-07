@@ -82,6 +82,42 @@ and tell the user what you changed.
 - Google Sheet: `gdrive_update_sheet` writes a 2D array into a range (formulas work).
 - Other files (.txt, .csv, .md…): `gdrive_update_file` replaces the whole content.
 
+## Anything else in Sheets, Docs or Drive
+
+Formatting, rows and columns, merges, number formats, data validation, conditional
+formatting, filters, charts, named ranges, document structure — the dedicated tools do not
+cover these. Use the generic proxy instead of saying it cannot be done:
+
+1. `gdrive_api_help()` — the services, their method counts, how to search.
+2. `gdrive_api_help(query: "freeze rows")` or `gdrive_api_help(service: "sheets")` — method ids.
+3. `gdrive_api_help(method: "sheets.spreadsheets.batchUpdate")` — parameters, request body,
+   the request types it accepts, and an example.
+4. `gdrive_api(method, params, body)` — the call itself.
+
+Path parameters (`spreadsheetId`, `documentId`, `fileId`) go in `params`, everything else in
+`params` becomes the query string, and `body` is the JSON request body.
+
+Common `sheets.spreadsheets.batchUpdate` requests, all in one call:
+
+```json
+{"requests": [
+  {"repeatCell": {"range": {"sheetId": 0, "startRowIndex": 0, "endRowIndex": 1},
+                  "cell": {"userEnteredFormat": {"textFormat": {"bold": true}}},
+                  "fields": "userEnteredFormat.textFormat.bold"}},
+  {"updateSheetProperties": {"properties": {"sheetId": 0, "gridProperties": {"frozenRowCount": 1}},
+                             "fields": "gridProperties.frozenRowCount"}},
+  {"updateDimensionProperties": {"range": {"sheetId": 0, "dimension": "COLUMNS", "startIndex": 0, "endIndex": 1},
+                                 "properties": {"pixelSize": 120}, "fields": "pixelSize"}}
+]}
+```
+
+Get `sheetId` values from `gdrive_api_help(method: "sheets.spreadsheets.get")` +
+`gdrive_api(method: "sheets.spreadsheets.get", params: {spreadsheetId})` — tab titles are not
+enough.
+
+Rules that still apply: only files in `gdrive_list_files`, never permanent deletion, and
+sharing/permission changes are blocked by design.
+
 ## Moving to the trash
 
 `gdrive_trash_file` moves a file or folder to the Drive trash; it can be restored from

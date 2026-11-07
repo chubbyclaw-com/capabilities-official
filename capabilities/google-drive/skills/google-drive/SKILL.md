@@ -18,86 +18,53 @@ connection works, not an error.
 A picked **folder** is a destination only. You can create files and subfolders inside it,
 but you cannot see what was already in it. Never claim you looked through a folder.
 
-## Connecting and picking more files
+## The tools
 
-When Drive is not connected yet, or the user mentions a file that is not in
-`gdrive_list_files`:
+- `gdrive_pick_files` — link for the owner to pick more files or folders
+- `gdrive_list_files` — everything you may use; IDs come from here
+- `gdrive_create_file` — new file, Google Doc (Markdown) or Google Sheet (CSV)
+- `gdrive_create_folder` — new folder in a picked or created folder
+- `gdrive_trash_file` — move to the trash (ask first)
+- `gdrive_disconnect` — forget the Google account
+- **`gdrive_api`** — any other Sheets / Docs / Drive REST method
+- **`gdrive_api_help`** — the method catalogue: services, ids, parameters, schemas
 
-1. Call `gdrive_pick_files`. It returns a link that opens Google's file picker.
-2. Ask with `AskUserQuestion`, in the user's language: one `radio` question whose label
-   carries the link as a Markdown link — for example
-   `[Open Google Drive](<link>) and pick the files, then choose Done. The link works for 10 minutes.`
-   — with two options meaning "Done" and "Cancel". Do not paste the link anywhere else.
-3. When they answer Done, call `gdrive_list_files`: the files they picked are in it.
-   If none of the expected files appear, ask them to confirm the picker finished and the
-   confirmation page said the file was added; if it did not, offer a new link.
-4. If they answered Cancel, stop and post nothing else. Do not claim a pick succeeded
-   without seeing the file in `gdrive_list_files`.
-
-The picker connects **your owner's** Google account (the person who set you up), so ask
-your owner to open the link. If someone else in the group asks you to use a file you
-cannot see, tell them your owner needs to pick it. Do not post the link for a group
-member to open on the owner's behalf.
-
-If a tool says Drive access was revoked or expired, do the same with a new link.
+If a file you need is not in `gdrive_list_files`, call `gdrive_pick_files`. The tool
+returns a link: ask with `AskUserQuestion` — one `radio` question whose label carries the
+link as a Markdown link, options meaning Done and Cancel — then call `gdrive_list_files`
+once they answer Done. The link works for 10 minutes and only the owner should open it.
 
 ## Reading
 
-`gdrive_read_file` returns Google Docs as Markdown, Slides as text, and Sheets as CSV of
-the first sheet. For a specific part of a sheet, pass `range` (for example
-`Sheet1!A1:D20`). Plain text files are downloaded.
+Reading goes through `gdrive_api`. Common shapes:
 
-Office files (Excel, Word, PowerPoint, and their OpenDocument versions) are read through a
-Google copy: the first read creates "<name> (Google Sheets copy)" (or Docs / Slides) in the
-user's Drive, and later reads reuse it, refreshed when the original changes. Mention the
-copy the first time. Editing the copy does not change the original file — say so before
-editing it.
+- Sheet range: `gdrive_api(method="sheets.spreadsheets.values.get",
+  params={"spreadsheetId": "<id>", "range": "Income!A1:F50"})`
+- Several ranges at once: `sheets.spreadsheets.values.batchGet` with
+  `"ranges": ["Income!A1:F50", "Expenses!A1:F50"]`
+- Google Doc as text: `drive.files.export` with `{"fileId": "<id>", "mimeType": "text/plain"}`
+- Doc structure with character indices: `docs.documents.get` with `{"documentId": "<id>"}`
+- Spreadsheet metadata (tab titles and `sheetId`s): `sheets.spreadsheets.get`
 
-Other binary files (PDF, images) come back as metadata and a link only — say so instead of
-guessing their content.
+`gdrive_api_help(service: "sheets")` lists every method id; `gdrive_api_help(method: "<id>")`
+gives its parameters and request body.
 
-## Creating
+## Writing and formatting
 
-- `gdrive_create_file` with `convert_to: "doc"` turns Markdown into a Google Doc; with
-  `convert_to: "sheet"` turns CSV into a Google Sheet. Without it the file is stored as-is
-  (`mime_type`, or `content_base64` for binary data).
-- A new spreadsheet has exactly one sheet (tab). Add the rest with `gdrive_add_sheet`
-  (`file_id`, `title`, optional `values` written from A1); tab titles must be unique.
-  `gdrive_update_sheet` only writes into a tab that already exists — it cannot create one.
-- Prefer building spreadsheets with `gdrive_add_sheet` over uploading an `.xlsx`: binary
-  uploads go through `content_base64`, which means carrying the whole file through the
-  conversation, and the result is not an editable native multi-tab Sheet.
-- Put new files in a picked folder with `folder_id`; otherwise they go to My Drive.
-- `gdrive_create_folder` creates a folder (optionally inside a picked folder).
+- Values: `sheets.spreadsheets.values.update` with
+  `params={"spreadsheetId": "<id>", "range": "Income!A1:B2", "valueInputOption": "USER_ENTERED"}`
+  and `body={"values": [["Date", "Amount"], ["2026-01-02", 12.5]]}`.
+  `values.append` adds rows at the end.
+- Structure, formatting, rows/columns, merges, number formats, validation, conditional
+  formatting, filters, charts: `sheets.spreadsheets.batchUpdate` with
+  `params={"spreadsheetId": "<id>"}` and `body={"requests": [...]}`. Tab titles are not
+  enough — `sheetId` comes from `sheets.spreadsheets.get`, and
+  `gdrive_api_help(method: "sheets.spreadsheets.batchUpdate")` lists the request types.
+- Editing a Doc: `docs.documents.batchUpdate` with `params={"documentId": "<id>"}` and
+  `body={"requests": [{"replaceAllText": {...}}]}`. Read the doc first; index-based
+  requests need indices from `docs.documents.get`.
 
-Share the returned link with the user.
-
-## Editing
-
-You may modify the files the user picked. Read the file first, change only what was asked,
-and tell the user what you changed.
-
-- Google Doc: `gdrive_edit_doc` with Docs API batchUpdate requests. Prefer
-  `replaceAllText` for wording changes; it needs no character positions.
-- Google Sheet: `gdrive_update_sheet` writes a 2D array into a range (formulas work).
-- Other files (.txt, .csv, .md…): `gdrive_update_file` replaces the whole content.
-
-## Anything else in Sheets, Docs or Drive
-
-Formatting, rows and columns, merges, number formats, data validation, conditional
-formatting, filters, charts, named ranges, document structure — the dedicated tools do not
-cover these. Use the generic proxy instead of saying it cannot be done:
-
-1. `gdrive_api_help()` — the services, their method counts, how to search.
-2. `gdrive_api_help(query: "freeze rows")` or `gdrive_api_help(service: "sheets")` — method ids.
-3. `gdrive_api_help(method: "sheets.spreadsheets.batchUpdate")` — parameters, request body,
-   the request types it accepts, and an example.
-4. `gdrive_api(method, params, body)` — the call itself.
-
-Path parameters (`spreadsheetId`, `documentId`, `fileId`) go in `params`, everything else in
-`params` becomes the query string, and `body` is the JSON request body.
-
-Common `sheets.spreadsheets.batchUpdate` requests, all in one call:
+Example — bold the header, freeze it, widen the first column, in one call:
 
 ```json
 {"requests": [
@@ -111,21 +78,29 @@ Common `sheets.spreadsheets.batchUpdate` requests, all in one call:
 ]}
 ```
 
-Get `sheetId` values from `gdrive_api_help(method: "sheets.spreadsheets.get")` +
-`gdrive_api(method: "sheets.spreadsheets.get", params: {spreadsheetId})` — tab titles are not
-enough.
+## Creating files and folders
 
-Rules that still apply: only files in `gdrive_list_files`, never permanent deletion, and
-sharing/permission changes are blocked by design.
+- `gdrive_create_file` with `convert_to: "doc"` turns Markdown into a Google Doc; with
+  `convert_to: "sheet"` turns CSV into a Google Sheet with a single tab. Without it the
+  file is stored as-is (`mime_type`, or `content_base64` for binary data). More tabs come
+  from `sheets.spreadsheets.batchUpdate` + `addSheet`.
+- Put new files in a picked folder with `folder_id`; otherwise they go to My Drive.
+- Uploading a **local sandbox file** is not supported yet: the tool takes content or
+  `content_base64`, so small text content can be created this way, but there is no
+  path-based upload. Say so instead of inventing one.
+- `gdrive_create_folder` creates a folder (optionally inside a picked folder).
+
+Share the returned link with the user.
 
 ## Moving to the trash
 
-`gdrive_trash_file` moves a file or folder to the Drive trash; it can be restored from
-there for 30 days. Before calling it, name the exact file and get the user's explicit
-"yes" in chat. Never trash several files on one vague instruction.
+`gdrive_trash_file` moves a file or folder to the Drive trash; it can be restored for 30
+days. Before calling it, name the exact file and get the user's explicit "yes" in chat.
+Never trash several files on one vague instruction.
 
-You can never permanently delete anything — there is no tool for it. If the user wants a
-file gone for good, tell them to empty it from the Drive trash themselves.
+You can never permanently delete anything — `drive.files.delete` is blocked, and there is
+no tool for it. Sharing and permission changes (`drive.permissions.*`) are blocked too.
+If the user wants a file gone for good, tell them to empty the Drive trash themselves.
 
 ## Disconnecting
 

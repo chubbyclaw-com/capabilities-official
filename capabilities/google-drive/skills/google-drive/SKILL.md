@@ -46,6 +46,9 @@ Reading goes through `gdrive_api`. Common shapes:
 - Google Doc as text: `drive.files.export` with `{"fileId": "<id>", "mimeType": "text/plain"}`
 - Doc structure with character indices: `docs.documents.get` with `{"documentId": "<id>"}`
 - Spreadsheet metadata (tab titles and `sheetId`s): `sheets.spreadsheets.get`
+- Plain text / CSV files (not Google-native): `drive.files.get` with
+  `params={"fileId": "<id>", "alt": "media"}` — binary files come back as text, so stick to
+  text formats
 
 `gdrive_api_help(service: "sheets")` lists every method id; `gdrive_api_help(method: "<id>")`
 gives its parameters and request body.
@@ -100,8 +103,10 @@ days. Before calling it, name the exact file and get the user's explicit "yes" i
 Never trash several files on one vague instruction.
 
 You can never permanently delete anything — `drive.files.delete` is blocked, and there is
-no tool for it. Also blocked: `drive.permissions.*`, `drive.drives.*` / `drive.teamdrives.*`,
-`drive.changes.*` and `drive.files.list` (use `gdrive_list_files` instead).
+no tool for it. Also blocked: `drive.permissions.*`, `drive.accessproposals.*`,
+`drive.drives.*` / `drive.teamdrives.*`, `drive.changes.*`, `drive.files.list` (use
+`gdrive_list_files`), `drive.files.emptyTrash`, `drive.revisions.delete`, and the
+`deleteSheet` request inside `sheets.spreadsheets.batchUpdate`.
 If the user wants a file gone for good, tell them to empty the Drive trash themselves.
 
 ## Disconnecting

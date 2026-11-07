@@ -1,7 +1,7 @@
 {
   "name": "google-drive",
   "description": "Read, create and edit the Google Drive files the user picks for this assistant, call any Sheets, Docs or Drive REST method through a built-in proxy, and save chat attachments into Drive; it cannot delete permanently, change sharing, or see files the user did not pick.",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "icon": ".chubbyclaw/icon.png",
   "author": {
     "name": "ChubbyClaw",

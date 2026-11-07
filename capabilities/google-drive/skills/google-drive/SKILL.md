@@ -63,6 +63,12 @@ guessing their content.
 - `gdrive_create_file` with `convert_to: "doc"` turns Markdown into a Google Doc; with
   `convert_to: "sheet"` turns CSV into a Google Sheet. Without it the file is stored as-is
   (`mime_type`, or `content_base64` for binary data).
+- A new spreadsheet has exactly one sheet (tab). Add the rest with `gdrive_add_sheet`
+  (`file_id`, `title`, optional `values` written from A1); tab titles must be unique.
+  `gdrive_update_sheet` only writes into a tab that already exists — it cannot create one.
+- Prefer building spreadsheets with `gdrive_add_sheet` over uploading an `.xlsx`: binary
+  uploads go through `content_base64`, which means carrying the whole file through the
+  conversation, and the result is not an editable native multi-tab Sheet.
 - Put new files in a picked folder with `folder_id`; otherwise they go to My Drive.
 - `gdrive_create_folder` creates a folder (optionally inside a picked folder).
 

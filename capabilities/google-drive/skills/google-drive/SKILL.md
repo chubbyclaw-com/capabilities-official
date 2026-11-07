@@ -25,6 +25,7 @@ but you cannot see what was already in it. Never claim you looked through a fold
 - `gdrive_create_file` — new file, Google Doc (Markdown) or Google Sheet (CSV)
 - `gdrive_create_folder` — new folder in a picked or created folder
 - `gdrive_trash_file` — move to the trash (ask first)
+- `gdrive_upload_file` — store a link's content (a chat attachment) in Drive
 - `gdrive_disconnect` — forget the Google account
 - **`gdrive_api`** — any other Sheets / Docs / Drive REST method
 - **`gdrive_api_help`** — the method catalogue: services, ids, parameters, schemas
@@ -85,9 +86,9 @@ Example — bold the header, freeze it, widen the first column, in one call:
   file is stored as-is (`mime_type`, or `content_base64` for binary data). More tabs come
   from `sheets.spreadsheets.batchUpdate` + `addSheet`.
 - Put new files in a picked folder with `folder_id`; otherwise they go to My Drive.
-- Uploading a **local sandbox file** is not supported yet: the tool takes content or
-  `content_base64`, so small text content can be created this way, but there is no
-  path-based upload. Say so instead of inventing one.
+- `gdrive_upload_file` stores the bytes behind a link the platform gives you (for
+  example a chat attachment URL) into Drive, optionally into `folder_id`. It only accepts
+  the platform's own links; if you have no such link, say so instead of inventing one.
 - `gdrive_create_folder` creates a folder (optionally inside a picked folder).
 
 Share the returned link with the user.

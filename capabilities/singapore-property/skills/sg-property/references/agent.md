@@ -15,13 +15,13 @@ throwaway query. Capturing the stated requirement is part of onboarding —
 also write a `sgprop:client-candidate` (buyer) / `sgprop:client-holding`
 (seller), or fill `profile.preferences`. See SKILL.md SOP §3a.
 
-`MemorySearch("sgprop:client")` — first check whether this client already
+`search_memory("sgprop:client")` — first check whether this client already
 exists (match by name / area / requirement); update rather than duplicate.
 
 For a new client, write a `sgprop:client` record:
 
 ````
-MemoryWrite(value="""sgprop:client | tan-2026-05-08 | Mr Tan
+write_memory(value="""sgprop:client | tan-2026-05-08 | Mr Tan
 
 role: buyer
 status: qualifying
@@ -38,7 +38,7 @@ status: qualifying
 `client_id` should be slug-safe (lowercase letters, digits, hyphens). A
 typical pattern is `<surname>-<YYYY-MM-DD>`. Echo `client_id` and name in
 the header **and** pass them as `tags=["sgprop:client", "<client_id>", "<name>"]`
-so future `MemorySearch` by id or name hits (retrieval rides on `tags`).
+so future `search_memory` by id or name hits (retrieval rides on `tags`).
 
 `role` is one of: `buyer`, `seller`, `both`.
 
@@ -50,9 +50,9 @@ go higher"), different bedrooms, added/dropped constraint (school, MRT,
 tenure: "freehold drop, 99yr also can"), or a shifted timeline — write the
 change back to memory **before or alongside** the re-search:
 
-- `MemorySearch("sgprop:client <client_id>")` → `MemoryGet(id)` → merge the
+- `search_memory("sgprop:client <client_id>")` → `get_memory(id)` → merge the
   revised field into the `sgprop:client-candidate` (or
-  `profile.preferences`) JSON → `MemoryUpdate(id, <new envelope>)` to
+  `profile.preferences`) JSON → `update_memory(id, <new envelope>)` to
   overwrite the record in place (same `id`, no stale duplicate). Do **not**
   write a new record and delete the old. See §2 and `memory-conventions.md`.
 - Do this for **every** revision, not just when the user says "remember".
@@ -62,7 +62,7 @@ change back to memory **before or alongside** the re-search:
 
 **Client record (memory) vs. deliverable (artifact) — don't confuse them.**
 The `sgprop:client*` memory records are the CRM source of truth that future
-`MemorySearch` reads. A shortlist / comparison table / CMA saved with
+`search_memory` reads. A shortlist / comparison table / CMA saved with
 `create_artifact` is a *handout snapshot*. When the agent says "save into
 Mr Tan's file / 存进 X 的档案", that means **update the client memory
 record**; producing a group-file artifact is an optional extra, never a
@@ -84,7 +84,7 @@ Always echo the `client_id` in the header **and** include it in `tags`
 
 # Client's existing holding (for upgrade work)
 
-MemoryWrite(value="""sgprop:client-holding | tan-2026-05-08 | Block 123 Tampines St 11 #08-12
+write_memory(value="""sgprop:client-holding | tan-2026-05-08 | Block 123 Tampines St 11 #08-12
 
 type: hdb
 purchase_date: 2015-04
@@ -108,7 +108,7 @@ purchase_price_sgd: 480000
 
 # Client's candidate
 
-MemoryWrite(value="""sgprop:client-candidate | tan-2026-05-08 | Bedok South Residences
+write_memory(value="""sgprop:client-candidate | tan-2026-05-08 | Bedok South Residences
 
 stage: shortlist
 
@@ -126,16 +126,16 @@ stage: shortlist
 
 Profile fields (income / nationality / preferences) live inside the
 `profile` substructure of the `sgprop:client` record. Update them via the
-client update protocol: `MemorySearch("sgprop:client tan-2026-05-08")` →
-`MemoryGet(id)` → merge `profile.<field>` into JSON →
-`MemoryUpdate(id, <new envelope>)` (in place, same `id`).
+client update protocol: `search_memory("sgprop:client tan-2026-05-08")` →
+`get_memory(id)` → merge `profile.<field>` into JSON →
+`update_memory(id, <new envelope>)` (in place, same `id`).
 
 To list everything for a client:
 
-- `MemorySearch("tan-2026-05-08")` returns the client header plus every
+- `search_memory("tan-2026-05-08")` returns the client header plus every
   `client-holding` / `client-candidate` / `viewing` / `offer` / `note`
   that carries the `client_id` in its `tags` (which is why every such write
-  must include it). Then `MemoryGet(id)` the ones you need.
+  must include it). Then `get_memory(id)` the ones you need.
 
 ## 3. Client requirement gathering
 
@@ -160,8 +160,8 @@ To list everything for a client:
 
 When the agent says "5 clients, $2-3m, family upgrade":
 
-1. `MemorySearch("sgprop:client")` to find clients.
-2. For each, `MemoryGet(id)` to read their `profile.preferences` from the
+1. `search_memory("sgprop:client")` to find clients.
+2. For each, `get_memory(id)` to read their `profile.preferences` from the
    client JSON body.
 3. Run a single `sgprop_search_projects` with the union of constraints.
 4. Score each project against each client (district match, school match,
@@ -241,12 +241,12 @@ Status progression for a client:
 `qualifying → dropped` (cold-cancelled)
 
 Update `status` with the client update protocol: Search → Get → merge
-`status` → `MemoryUpdate(id)` (in place).
+`status` → `update_memory(id)` (in place).
 
 A weekly funnel report:
 
-- `MemorySearch("sgprop:client")` (raise `limit` if you have many clients).
-- `MemoryGet(id)` each to read `status` and the platform record's
+- `search_memory("sgprop:client")` (raise `limit` if you have many clients).
+- `get_memory(id)` each to read `status` and the platform record's
   `updated_at`.
 - Group by status, count, and surface stale ones (`updated_at` not changed
   in > 14 days — chase up).

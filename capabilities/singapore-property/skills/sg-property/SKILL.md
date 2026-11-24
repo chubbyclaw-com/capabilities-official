@@ -17,8 +17,8 @@ router; role-specific SOPs live under `references/`.
    - `references/agent.md` — for agents managing multiple clients (CMA reports, batch matching, viewings)
 3. **Read other references on demand:**
    - `references/memory-conventions.md` — whenever you read or write any
-     persistent state via `MemoryWrite / MemoryGet / MemorySearch /
-MemoryList / MemoryUpdate / MemoryDelete`
+     persistent state via `write_memory / get_memory / search_memory /
+list_memories / update_memory / delete_memory`
    - `references/calc-rules.md` — when calling any `calc_*.py`
 4. **Follow the public SOP below** in every interaction regardless of role.
 
@@ -41,15 +41,15 @@ references freely as the conversation evolves.
 - Tax / loan / yield numbers come from `scripts/calc_*.py`. The first time
   you need to call one in a session, confirm `python3 --version` is ≥ 3.10
   and the script is reachable; surface a clear error to the user if not.
-- Memory is platform-native (`MemoryWrite / MemoryGet / MemorySearch /
-MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
+- Memory is platform-native (`write_memory / get_memory / search_memory /
+list_memories / update_memory / delete_memory`) — no environment check needed.
 
 ### 2. Look before you ask
 
 - At the start of a session (or once per role switch), call
-  `MemorySearch("sgprop:profile")` before asking the user anything. If a
-  hit comes back, `MemoryGet` it and use the stored fields; do not re-ask.
-- For agents, also call `MemorySearch("sgprop:client")` to surface known
+  `search_memory("sgprop:profile")` before asking the user anything. If a
+  hit comes back, `get_memory` it and use the stored fields; do not re-ask.
+- For agents, also call `search_memory("sgprop:client")` to surface known
   clients.
 
 ### 3. Progressive profile filling
@@ -61,13 +61,13 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
   - "Find me a 3BR" → ask budget, preferred districts, commute, school
     preference, segment.
 - For structured fields (nationality, residency status, marital status, segment,
-  district, HDB/private ownership), use `AskUserQuestion` tool with
+  district, HDB/private ownership), use `ask_user_question` tool with
   multiple-choice options — do **not** ask these as free-form text.
 - After the user answers, persist immediately by **updating** the profile
-  memory in place: `MemorySearch("sgprop:profile")` → `MemoryGet(id)` →
-  merge the new fields → `MemoryUpdate(id, <new envelope>)` (omit `tags` —
+  memory in place: `search_memory("sgprop:profile")` → `get_memory(id)` →
+  merge the new fields → `update_memory(id, <new envelope>)` (omit `tags` —
   the identifier is unchanged). If no profile exists yet, just
-  `MemoryWrite(..., tags=["sgprop:profile"])`. See
+  `write_memory(..., tags=["sgprop:profile"])`. See
   `references/memory-conventions.md` for the envelope shape, the per-kind
   `tags`, and the full update protocol.
 - Every field is optional. If the user prefers not to share, give a
@@ -88,7 +88,7 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
   `sgprop:client-candidate` (buyer) or `sgprop:client-holding` (seller), or
   into `profile.preferences`. Follow `references/agent.md` §1. Do **not**
   wait for the user to ask you to save.
-- First `MemorySearch("sgprop:client")` to avoid duplicating an existing
+- First `search_memory("sgprop:client")` to avoid duplicating an existing
   client (match by name / area / requirement); update rather than re-add.
 - If the client's name is not given yet, mint a placeholder `client_id`
   (e.g. `client-<area>-YYYY-MM-DD`) and onboard now; ask for the name once
@@ -103,13 +103,13 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
   capture: **before or alongside** re-searching, write the new value back
   to that client's `sgprop:client-candidate` (or `profile.preferences`)
   in place via the memory update protocol (Search → Get → merge →
-  `MemoryUpdate(id)`). Otherwise the next recall returns the stale
+  `update_memory(id)`). Otherwise the next recall returns the stale
   requirement.
 - **An artifact / group file is NOT a substitute for updating memory
   (HARD).** A comparison table, shortlist doc, or CMA you save as a group
   file (`create_artifact`) is a _deliverable snapshot_; the
   `sgprop:client*` memory record is the CRM source of truth that later
-  `MemorySearch` reads. They are different stores. When the user says
+  `search_memory` reads. They are different stores. When the user says
   "save this to <client>'s file / 存进 X 的档案", **update the client
   memory record first**, then optionally also create the artifact if they
   want a shareable document — never do only the artifact and leave the
@@ -125,7 +125,7 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
   **not** write a single free-form summary memory.
 - **Decompose, never lump.** One logical entity = one record:
   - identity / finance / ownership / intent / preferences → one
-    `sgprop:profile`, `tags=["sgprop:profile"]` (create with `MemoryWrite`
+    `sgprop:profile`, `tags=["sgprop:profile"]` (create with `write_memory`
     if none, else update in place per §3).
   - **each property the user owns** → its own `sgprop:holding` record,
     `tags=["sgprop:holding", "<address>"]`. An upgrader typically has ≥ 2
@@ -143,12 +143,12 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
 ### 4. Memory access rules (HARD)
 
 - Read or write persistent state **only** through the platform
-  `Memory*` tools. Do **not** invent local file storage (`~/.config/...`,
-  `Write` to disk, etc.) for any sgprop data.
-- Every `MemoryWrite` must (a) lead its `value` with the
+  memory tools (`write_memory`, `get_memory`, …). Do **not** invent local file storage (`~/.config/...`,
+  the `write` tool to disk, etc.) for any sgprop data.
+- Every `write_memory` must (a) lead its `value` with the
   `sgprop:<kind> | <identifier>` header line (human-readable + JSON-parse
   anchor) **and** (b) pass `tags=["sgprop:<kind>", "<identifier>", ...]` —
-  the stable, verbatim retrieval atoms that make `MemorySearch("sgprop:...")`
+  the stable, verbatim retrieval atoms that make `search_memory("sgprop:...")`
   hit. Retrieval rides on `tags`, not on MetaGen's keywords. See
   `references/memory-conventions.md` for the per-kind `tags` table and
   templates.
@@ -159,13 +159,13 @@ MemoryList / MemoryUpdate / MemoryDelete`) — no environment check needed.
 - Sensitive fields (income, CPF balance, NRIC / nationality) write to
   `scope=user` only. Confirm with the user before persisting if the
   conversation context is a group chat.
-- To edit a stored record, use `MemoryUpdate(id, value)` in place via the
-  Search → Get → merge → `MemoryUpdate(id)` protocol — do **not** write a new
+- To edit a stored record, use `update_memory(id, value)` in place via the
+  Search → Get → merge → `update_memory(id)` protocol — do **not** write a new
   record and delete the old. Omit `tags` so the existing retrieval atoms are
   kept; pass a new `tags` array only when the identifier itself changes (a
   renamed client, a re-addressed holding). Write independent event records
   (`sgprop:viewing`, `sgprop:offer`, `sgprop:note`) for new occurrences, and
-  `MemoryDelete(id)` to remove. See `references/memory-conventions.md`.
+  `delete_memory(id)` to remove. See `references/memory-conventions.md`.
 
 ### 5. Policy math rules (HARD)
 

@@ -31,7 +31,7 @@ but you cannot see what was already in it. Never claim you looked through a fold
 - **`gdrive_api_help`** — the method catalogue: services, ids, parameters, schemas
 
 If a file you need is not in `gdrive_list_files`, call `gdrive_pick_files`. The tool
-returns a link: ask with `AskUserQuestion` — one `radio` question whose label carries the
+returns a link: ask with `ask_user_question` — one `radio` question whose label carries the
 link as a Markdown link, options meaning Done and Cancel — then call `gdrive_list_files`
 once they answer Done. The link works for 10 minutes and only the owner should open it.
 

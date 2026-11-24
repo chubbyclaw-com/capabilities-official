@@ -1,8 +1,8 @@
 # Memory conventions
 
 All `sgprop` persistent state lives in the ChubbyClaw platform memory store,
-accessed via the native `MemoryWrite / MemoryGet / MemorySearch / MemoryList /
-MemoryUpdate / MemoryDelete` tools. There is **no** local `~/.config/sgprop`
+accessed via the native `write_memory / get_memory / search_memory / list_memories /
+update_memory / delete_memory` tools. There is **no** local `~/.config/sgprop`
 directory and no `mem.py` CLI any more — those were removed when we moved to
 the platform memory tool.
 
@@ -10,26 +10,26 @@ Platform contract (excerpt of `chubbyclaw/docs/design/14-memory-system.md`):
 
 | Item | Value |
 |------|-------|
-| Tools | `MemoryWrite(value, tags?, scope?, expires_in_days?)`, `MemoryGet(id)`, `MemorySearch(query, limit?)`, `MemoryList(limit?)`, `MemoryUpdate(id, value, tags?)`, `MemoryDelete(id)` |
+| Tools | `write_memory(value, tags?, scope?, expires_in_days?)`, `get_memory(id)`, `search_memory(query, limit?)`, `list_memories(limit?)`, `update_memory(id, value, tags?)`, `delete_memory(id)` |
 | `scope` | `user` (default) or `chatgroup` — server-injected `subject_type / subject_id / actor` cannot be set by the model |
 | `value` | Plaintext ≤ 8 KB; encrypted at rest with a per-subject DEK |
-| Metadata | Server LLM (MetaGen) generates `summary` (≤ 200 chars) + natural-language `keywords` (≤ 8 items) at write/update time. `MemorySearch` returns meta only; call `MemoryGet(id)` to read `value` |
-| `tags` | Optional `string[]` the **caller** passes to `MemoryWrite` / `MemoryUpdate`: explicit, stable retrieval atoms stored **verbatim**. They sit alongside the LLM `keywords` and both participate in `MemorySearch` substring matching, but `tags` are **never** rewritten or dropped by MetaGen — this is what makes the `sgprop:<kind>` atoms reliably findable. On `MemoryUpdate`: **omit** `tags` = keep the record's existing tags (the norm when you only change `value`); **pass** `tags` = full overwrite (pass `[]` to clear) |
-| Editing | `MemoryUpdate(id, value)` replaces an existing record's content **in place**, keeping the same `id` and re-deriving summary/keywords (existing `tags` are preserved unless you pass new ones). This is the correct way to apply a correction — not write-new-then-delete |
+| Metadata | Server LLM (MetaGen) generates `summary` (≤ 200 chars) + natural-language `keywords` (≤ 8 items) at write/update time. `search_memory` returns meta only; call `get_memory(id)` to read `value` |
+| `tags` | Optional `string[]` the **caller** passes to `write_memory` / `update_memory`: explicit, stable retrieval atoms stored **verbatim**. They sit alongside the LLM `keywords` and both participate in `search_memory` substring matching, but `tags` are **never** rewritten or dropped by MetaGen — this is what makes the `sgprop:<kind>` atoms reliably findable. On `update_memory`: **omit** `tags` = keep the record's existing tags (the norm when you only change `value`); **pass** `tags` = full overwrite (pass `[]` to clear) |
+| Editing | `update_memory(id, value)` replaces an existing record's content **in place**, keeping the same `id` and re-deriving summary/keywords (existing `tags` are preserved unless you pass new ones). This is the correct way to apply a correction — not write-new-then-delete |
 
 Skill responsibility:
 
 1. Format `value` so MetaGen produces a useful summary, and pass the
    record's stable retrieval atoms via `tags` (see [Record envelope](#record-envelope)).
 2. When an existing record's fields change, edit it **in place** with the
-   Search → Get → merge → `MemoryUpdate(id)` protocol — do **not** write a new
+   Search → Get → merge → `update_memory(id)` protocol — do **not** write a new
    record and delete the old one (see [Update protocol](#update-protocol)).
 3. Keep all sgprop writes under `scope=user` unless the user is in a group
    chat and explicitly asks to share — see [Scope](#scope) below.
 
 ## Record envelope
 
-Every memory record is one logical entity. Each `MemoryWrite` carries two
+Every memory record is one logical entity. Each `write_memory` carries two
 things: the `value` text (below) **and** a `tags` array of the record's
 stable retrieval atoms. The `value` follows this shape:
 
@@ -49,14 +49,14 @@ Pass the matching `tags` on every write — `sgprop:<kind>` plus that kind's
 identifier(s):
 
 ```
-MemoryWrite(value="""sgprop:candidate | Stirling Residences | 2026-05
+write_memory(value="""sgprop:candidate | Stirling Residences | 2026-05
 ...
 """, tags=["sgprop:candidate", "Stirling Residences"])
 ```
 
 - **Retrieval is carried by `tags`, not by MetaGen.** The atoms you pass in
-  `tags` are stored verbatim and matched by `MemorySearch` as-is, so
-  `MemorySearch("sgprop:candidate")` / `MemorySearch("sgprop:client <id>")`
+  `tags` are stored verbatim and matched by `search_memory` as-is, so
+  `search_memory("sgprop:candidate")` / `search_memory("sgprop:client <id>")`
   reliably hit. (MetaGen's `keywords` are natural-language and may drop the
   `sgprop:<kind>` header — never rely on them for atom lookup.)
 - The **first line** of `value` is still the human-readable header and the
@@ -65,7 +65,7 @@ MemoryWrite(value="""sgprop:candidate | Stirling Residences | 2026-05
 - The **plaintext key:value block** carries the most important facts so the
   MetaGen `summary` reads naturally.
 - The **fenced JSON** is the machine-readable canonical form. After
-  `MemoryGet(id)`, parse this block to get every field.
+  `get_memory(id)`, parse this block to get every field.
 - Always echo the entity's key identifier(s) — `client_id`, full address,
   project name — verbatim in **both** the header and `tags`.
 
@@ -84,8 +84,8 @@ MemoryWrite(value="""sgprop:candidate | Stirling Residences | 2026-05
 | `sgprop:note` | any | parent record identifier (free text) | `["sgprop:note", "<parent identifier>"]` | N |
 
 The `tags` column is the stable retrieval atom set: always `sgprop:<kind>`
-plus the identifier(s) future `MemorySearch` calls will query on. Pass it
-verbatim on every `MemoryWrite`. For `client` records also include the
+plus the identifier(s) future `search_memory` calls will query on. Pass it
+verbatim on every `write_memory`. For `client` records also include the
 client name as an extra tag if you want name lookups to hit
 (`["sgprop:client", "<client_id>", "<name>"]`).
 
@@ -306,60 +306,60 @@ text: viewed 2026-05-10; agent quoted 2.32m floor
 ## Update protocol
 
 **When a field on an existing record changes, edit that record in place with
-`MemoryUpdate(id, value)`.** This is the right tool whenever the new value
+`update_memory(id, value)`.** This is the right tool whenever the new value
 *replaces* an old one on a record you can locate by `id`: a corrected budget,
-an advanced `stage`, a renamed client, a revised `status`. `MemoryUpdate`
+an advanced `stage`, a renamed client, a revised `status`. `update_memory`
 keeps the same `id`, re-derives the summary/keywords, and leaves no stale
 duplicate behind.
 
 To edit a record:
 
-1. `MemorySearch("sgprop:<kind> <identifier>")` to locate the existing
+1. `search_memory("sgprop:<kind> <identifier>")` to locate the existing
    memory's `id`.
-2. `MemoryGet(id)` to read the current canonical JSON.
+2. `get_memory(id)` to read the current canonical JSON.
 3. Merge the new fields into the JSON in your head / scratchpad to build the
-   complete new envelope (`MemoryUpdate` replaces the whole `value`, so it
+   complete new envelope (`update_memory` replaces the whole `value`, so it
    must carry every field, not just the changed one).
-4. `MemoryUpdate(id, <new envelope>)` — overwrites the record in place.
+4. `update_memory(id, <new envelope>)` — overwrites the record in place.
    **Omit `tags`** so the record keeps its existing retrieval atoms; you are
    only changing `value`, not how the record is found.
 
 **Tags on update — only when the identifier itself changes.** Pass a new
-`tags` array to `MemoryUpdate` *solely* when the atom you search on moves —
+`tags` array to `update_memory` *solely* when the atom you search on moves —
 e.g. a client renamed (`client_id` re-slugged) or a holding re-addressed.
-Then pass the full replacement set (`MemoryUpdate(id, value, tags=["sgprop:client", "<new_id>", "<new name>"]`)
+Then pass the full replacement set (`update_memory(id, value, tags=["sgprop:client", "<new_id>", "<new name>"]`)
 and update the `value` header to match. A field edit that does **not** touch
 the identifier (a corrected budget, an advanced `stage`, a revised `status`)
 leaves `tags` untouched — omit the parameter.
 
-Do **not** `MemoryWrite` a second record and then `MemoryDelete` the old one
+Do **not** `write_memory` a second record and then `delete_memory` the old one
 to simulate an edit — that briefly leaves two conflicting copies and is the
-exact pattern `MemoryUpdate` exists to replace. Only write-then-delete when
+exact pattern `update_memory` exists to replace. Only write-then-delete when
 the user explicitly wants the old value preserved as a separate history entry
 (see [Conflicts](#conflict-handling)).
 
-### When NOT to use MemoryUpdate
+### When NOT to use update_memory
 
 - **A brand-new entity** (a client you have not stored yet, a first profile):
-  there is no `id` to update → `MemoryWrite`.
+  there is no `id` to update → `write_memory`.
 - **Appending an event** (the user did something new — a viewing, an offer, a
   note): write a brand-new `sgprop:viewing` / `sgprop:offer` / `sgprop:note`
   record; do **not** mutate the parent `holding` / `candidate` and do **not**
-  `MemoryUpdate` the parent. Recall via `MemorySearch("sgprop:viewing
+  `update_memory` the parent. Recall via `search_memory("sgprop:viewing
   <address>")`.
-- **Removing** a record: `MemoryDelete(id)`.
+- **Removing** a record: `delete_memory(id)`.
 
-So: a stored field *changed* → `MemoryUpdate`. Something *new happened* →
-`MemoryWrite` a new record. A record is *gone* → `MemoryDelete`.
+So: a stored field *changed* → `update_memory`. Something *new happened* →
+`write_memory` a new record. A record is *gone* → `delete_memory`.
 
 ### Cascading delete
 
 When a parent entity is removed (drop a client, dispose of a holding):
 
-1. `MemorySearch("<parent_identifier>")` — find every related record
+1. `search_memory("<parent_identifier>")` — find every related record
    (`client-holding`, `client-candidate`, `viewing`, `offer`, `note`).
 2. Read each result's `id`.
-3. `MemoryDelete(id)` for every one of them, plus the parent itself.
+3. `delete_memory(id)` for every one of them, plus the parent itself.
 
 There is no automatic cascade; the skill drives it.
 
@@ -367,7 +367,7 @@ There is no automatic cascade; the skill drives it.
 
 When the user gives a value that contradicts something already stored:
 
-1. `MemorySearch` then `MemoryGet` to surface the current state.
+1. `search_memory` then `get_memory` to surface the current state.
 2. Restate the diff to the user: "已记录 budget 2.5m,你刚说 2.2m。"
 3. Ask: overwrite / add a new entry / keep the existing? Do **not** silently
    overwrite.
@@ -410,11 +410,11 @@ Long-lived facts (profile, client header, holding header) omit
 
 | User says | Call |
 |-----------|------|
-| "我是谁的画像" / first-time entry | `MemorySearch("sgprop:profile")` → `MemoryGet(id)` (or `MemoryWrite(..., tags=["sgprop:profile"])` if empty) |
-| "我新看了一套" | `MemoryWrite("sgprop:candidate \| <project> \| <month>", ..., tags=["sgprop:candidate", "<project>"])` |
-| "我去看过 Stirling 了" | `MemoryWrite("sgprop:viewing \| Stirling Residences \| <date>", ..., tags=["sgprop:viewing", "Stirling Residences"])` |
-| "我的预算上调到 2.7m" | Search profile → Get → merge `budget_max_sgd` → `MemoryUpdate(id)` (tags unchanged) |
-| "把 Tan 的状态改成 offer" | Search `sgprop:client tan-2026-05-08` → Get → merge `status` → `MemoryUpdate(id)` (tags unchanged) |
-| "列一下我手上的客户" | `MemorySearch("sgprop:client")` |
+| "我是谁的画像" / first-time entry | `search_memory("sgprop:profile")` → `get_memory(id)` (or `write_memory(..., tags=["sgprop:profile"])` if empty) |
+| "我新看了一套" | `write_memory("sgprop:candidate \| <project> \| <month>", ..., tags=["sgprop:candidate", "<project>"])` |
+| "我去看过 Stirling 了" | `write_memory("sgprop:viewing \| Stirling Residences \| <date>", ..., tags=["sgprop:viewing", "Stirling Residences"])` |
+| "我的预算上调到 2.7m" | Search profile → Get → merge `budget_max_sgd` → `update_memory(id)` (tags unchanged) |
+| "把 Tan 的状态改成 offer" | Search `sgprop:client tan-2026-05-08` → Get → merge `status` → `update_memory(id)` (tags unchanged) |
+| "列一下我手上的客户" | `search_memory("sgprop:client")` |
 | "删掉 Tan 这个客户" | Search `tan-2026-05-08` → delete all hits |
-| "记一笔:这套西晒" | `MemoryWrite("sgprop:note \| candidate \| <project>", ..., tags=["sgprop:note", "<project>"])` |
+| "记一笔:这套西晒" | `write_memory("sgprop:note \| candidate \| <project>", ..., tags=["sgprop:note", "<project>"])` |

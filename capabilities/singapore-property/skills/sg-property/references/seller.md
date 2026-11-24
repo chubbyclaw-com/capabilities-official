@@ -12,8 +12,8 @@ home being sold plus any investment unit).
 
 ### 1a. Profile
 
-`MemorySearch("sgprop:profile")` — if a hit comes back, `MemoryGet(id)` and
-update in place (§3 protocol). If none, `MemoryWrite` a fresh
+`search_memory("sgprop:profile")` — if a hit comes back, `get_memory(id)` and
+update in place (§3 protocol). If none, `write_memory` a fresh
 `sgprop:profile`, `tags=["sgprop:profile"]`, capturing identity / finance /
 ownership counts / `intent` (`sell` or `upgrade`). For an upgrader, also
 record the target-purchase preferences (budget, segment, districts) here —
@@ -21,8 +21,8 @@ the buyer workflow (`references/buyer.md`) reads the same profile.
 
 ### 1b. Holdings
 
-`MemorySearch("sgprop:holding")` — see what's known. If a hit comes back,
-`MemoryGet(id)` to read the stored fields. For **each** property the user
+`search_memory("sgprop:holding")` — see what's known. If a hit comes back,
+`get_memory(id)` to read the stored fields. For **each** property the user
 owns (ask once per unit if empty or asking about a different unit):
 
 - address (block + unit number)
@@ -40,7 +40,7 @@ the matrimonial home and any investment unit as **separate** records, each
 with its own `tags`):
 
 ```
-MemoryWrite(value="""sgprop:holding | Marine Blue #18-05
+write_memory(value="""sgprop:holding | Marine Blue #18-05
 
 type: private
 purchase_date: 2019-08
@@ -117,9 +117,9 @@ that funds the next purchase.
   buffer), market (median), quick (2-5% below median).
 
 Persist the chosen `listing_price_sgd` (and the rest of the `sales`
-substructure) with the update protocol: `MemorySearch("sgprop:holding
-<address>")` → `MemoryGet(id)` → merge `sales.listing_price_sgd` →
-`MemoryUpdate(id, <new envelope>)` (in place, same `id`).
+substructure) with the update protocol: `search_memory("sgprop:holding
+<address>")` → `get_memory(id)` → merge `sales.listing_price_sgd` →
+`update_memory(id, <new envelope>)` (in place, same `id`).
 
 ## 5. Timing decision
 
@@ -159,14 +159,14 @@ holding.
 Set the listing live by updating the holding's `sales.status` and
 `sales.listed_date` via the update protocol:
 
-`MemorySearch("sgprop:holding Marine Blue #18-05")` → `MemoryGet(id)` →
+`search_memory("sgprop:holding Marine Blue #18-05")` → `get_memory(id)` →
 merge `sales.listed_date = "2026-05-09"`, `sales.status = "live"` →
-`MemoryUpdate(id, <new envelope>)` (in place, same `id`).
+`update_memory(id, <new envelope>)` (in place, same `id`).
 
 Then, for each viewing / offer:
 
 ```
-MemoryWrite(value="""sgprop:viewing | Marine Blue #18-05 | 2026-05-12
+write_memory(value="""sgprop:viewing | Marine Blue #18-05 | 2026-05-12
 
 outcome: interested
 attendees: 2
@@ -179,7 +179,7 @@ attendees: 2
 ```
 
 ```
-MemoryWrite(value="""sgprop:offer | Marine Blue #18-05 | 2026-05-15
+write_memory(value="""sgprop:offer | Marine Blue #18-05 | 2026-05-15
 
 amount_sgd: 1830000
 status: rejected
@@ -191,9 +191,9 @@ status: rejected
 """, tags=["sgprop:offer", "Marine Blue #18-05"])
 ```
 
-To review the listing history: `MemorySearch("sgprop:viewing Marine Blue
-#18-05")` and `MemorySearch("sgprop:offer Marine Blue #18-05")`, then
-`MemoryGet` each hit and assemble the timeline in the reply. Independent
+To review the listing history: `search_memory("sgprop:viewing Marine Blue
+#18-05")` and `search_memory("sgprop:offer Marine Blue #18-05")`, then
+`get_memory` each hit and assemble the timeline in the reply. Independent
 records keep appends conflict-free.
 
 ## 8. Upgrade chain

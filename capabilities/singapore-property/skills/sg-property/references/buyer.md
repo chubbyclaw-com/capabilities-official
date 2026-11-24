@@ -7,8 +7,8 @@ ordered, but skip ahead when the user already has the answer.
 
 **Goal:** know how much they can spend and what taxes apply before browsing.
 
-1. `MemorySearch("sgprop:profile")` to see what is already known; if a hit
-   comes back, `MemoryGet(id)` to read the stored fields.
+1. `search_memory("sgprop:profile")` to see what is already known; if a hit
+   comes back, `get_memory(id)` to read the stored fields.
 2. Ask only the missing fields needed for ABSD + TDSR (or MSR for
    HDB/EC):
    - `nationality`, `marital_status`, `spouse_nationality` (if married),
@@ -16,11 +16,11 @@ ordered, but skip ahead when the user already has the answer.
    - `finance.monthly_income_sgd`, `finance.monthly_debt_sgd`,
      `finance.cpf_oa_sgd`, `finance.cash_available_sgd`
 3. Persist each answer immediately using the profile update protocol:
-   `MemorySearch("sgprop:profile")` → `MemoryGet(id)` → merge →
-   `MemoryUpdate(id, <new envelope>)` to overwrite in place. If no profile
-   exists yet, just `MemoryWrite` a fresh `sgprop:profile` envelope (see
+   `search_memory("sgprop:profile")` → `get_memory(id)` → merge →
+   `update_memory(id, <new envelope>)` to overwrite in place. If no profile
+   exists yet, just `write_memory` a fresh `sgprop:profile` envelope (see
    `references/memory-conventions.md` for the shape and the full
-   Search→Get→merge→`MemoryUpdate` protocol).
+   Search→Get→merge→`update_memory` protocol).
 4. Compute caps:
    - `echo '{...}' | python3 scripts/calc_tdsr.py` → max loan
    - For HDB / EC also run `calc_msr.py`
@@ -42,7 +42,7 @@ Ask the questions that narrow the search space:
 - must-haves and nice-to-haves?
 
 Persist by running the profile update protocol again (Search → Get →
-merge new `preferences` block → `MemoryUpdate(id)`). Tag unstable wishes
+merge new `preferences` block → `update_memory(id)`). Tag unstable wishes
 (e.g. "near a park I like") into the profile's `notes` field, or write a
 free-standing `sgprop:note` if it's verbose.
 
@@ -61,7 +61,7 @@ For each candidate the user wants to track, write a `sgprop:candidate`
 record:
 
 ```
-MemoryWrite(value="""sgprop:candidate | Stirling Residences | 2026-05
+write_memory(value="""sgprop:candidate | Stirling Residences | 2026-05
 
 address: Stirling Rd
 stage: shortlist
@@ -90,10 +90,10 @@ Per candidate:
 
 Update the candidate with what you learn using the update protocol:
 
-1. `MemorySearch("sgprop:candidate Stirling Residences")` → grab the id
-2. `MemoryGet(id)` → parse the JSON body
+1. `search_memory("sgprop:candidate Stirling Residences")` → grab the id
+2. `get_memory(id)` → parse the JSON body
 3. Merge `estimated_value_sgd`, `pros`, `cons` into the JSON
-4. `MemoryUpdate(id, <new envelope>)` — in place, same `id`; omit `tags`
+4. `update_memory(id, <new envelope>)` — in place, same `id`; omit `tags`
    (the identifier hasn't changed). Do **not** write a new record and delete
    the old one.
 
@@ -144,7 +144,7 @@ Stage progresses along `shortlist → viewing_scheduled → viewed → offered
 → {declined | closed}`.
 
 When the user views, makes an offer, or closes, advance the `stage` field
-via the update protocol (Search → Get → merge `stage` → `MemoryUpdate(id)`).
+via the update protocol (Search → Get → merge `stage` → `update_memory(id)`).
 Then, for the event itself, write an independent record:
 
 - Viewing → `sgprop:viewing` (template in `references/memory-conventions.md`)
@@ -153,7 +153,7 @@ Then, for the event itself, write an independent record:
 Drop a free-text note as its own record:
 
 ```
-MemoryWrite(value="""sgprop:note | candidate | Stirling Residences
+write_memory(value="""sgprop:note | candidate | Stirling Residences
 
 text: viewed 2026-05-10; agent quoted $2.32m floor
 

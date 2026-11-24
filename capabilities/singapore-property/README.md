@@ -13,7 +13,7 @@ Singapore residential property decision assistant. Three role-aware workflows (b
 - The skill router (`skills/sg-property/SKILL.md`) detects which role applies and pulls in the right reference.
 - Data queries go through the `sgprop` MCP tools (`sgprop_search_projects`, `sgprop_project_report`, `sgprop_transactions`, `sgprop_supply_outlook`, `sgprop_location_context`).
 - Tax / loan / yield computations use deterministic Python scripts under `skills/sg-property/scripts/`.
-- Personal data (`profile`, `holding`, `candidate`, `client`, viewings, offers, notes) is persisted via the ChubbyClaw platform's native memory tools (`MemoryWrite / MemoryGet / MemorySearch / MemoryList / MemoryDelete`). Default `scope=user`; see `skills/sg-property/references/memory-conventions.md` for the record envelope and update protocol.
+- Personal data (`profile`, `holding`, `candidate`, `client`, viewings, offers, notes) is persisted via the ChubbyClaw platform's native memory tools (`write_memory / get_memory / search_memory / list_memories / delete_memory`). Default `scope=user`; see `skills/sg-property/references/memory-conventions.md` for the record envelope and update protocol.
 
 ## Requirements
 

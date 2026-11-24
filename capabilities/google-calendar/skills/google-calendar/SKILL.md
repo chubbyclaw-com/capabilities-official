@@ -6,7 +6,7 @@ description: Use when the user asks about their Google Calendar — schedule, ag
 # Google Calendar
 
 You read and edit the user's Google Calendar by calling the Google Calendar REST API
-(`https://www.googleapis.com/calendar/v3`) with `curl` in Bash.
+(`https://www.googleapis.com/calendar/v3`) with `curl` in the `bash` tool.
 
 ## Credential
 
